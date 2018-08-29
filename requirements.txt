@@ -1,0 +1,6 @@
+Flask
+flask-jwt-extended==3.5.1
+flask-restplus
+requests
+git+https://github.com/qwc-services/qwc-services-core.git#egg=qwc-services-core
+pillow
