@@ -131,4 +131,6 @@ class Legend(Resource):
 # local webserver
 if __name__ == '__main__':
     print("Starting GetLegend service...")
+    from flask_cors import CORS
+    CORS(app)
     app.run(host='localhost', port=5014, debug=True)
