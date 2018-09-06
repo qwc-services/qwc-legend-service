@@ -42,10 +42,6 @@ Sample request:
 
     http://localhost:5014/<mapid>?SERVICE=WMS&REQUEST=GetLegendGraphic&LAYER=<layername>&format=image/png&....
 
-Test request:
-
-    http://localhost:5014/altlast?layer=Grundstuecke&format=image/png
-
 Development
 -----------
 
