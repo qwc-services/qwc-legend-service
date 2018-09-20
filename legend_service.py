@@ -8,7 +8,8 @@ import requests
 from qwc_services_core.cache import Cache
 
 
-OGC_SERVER_URL = os.environ.get('OGC_SERVICE_URL', 'http://localhost:5013/')
+OGC_SERVER_URL = os.environ.get('OGC_SERVICE_URL',
+                                'http://localhost:5013/').rstrip("/") + "/"
 QWC2_PATH = os.environ.get('QWC2_PATH', 'qwc2/')
 
 PIL_Formats = {
@@ -70,7 +71,7 @@ class LegendService:
                 }
                 req_params.update(params)
                 response = requests.get(
-                    OGC_SERVER_URL.rstrip("/") + "/" + mapid, params=req_params,
+                    OGC_SERVER_URL + mapid, params=req_params,
                     timeout=10
                 )
                 self.logger.debug("Forwarding request to %s" % response.url)
