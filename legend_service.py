@@ -148,7 +148,6 @@ class LegendService:
         return send_file(data, mimetype=format_param)
 
     def get_legend_image(self, mapid, layer):
-        print(os.path.join(QWC2_PATH, 'assets', 'legend', mapid, layer + '.png'))
         try:
             return open(os.path.join(QWC2_PATH, 'assets', 'legend', mapid, layer + '.png'), 'rb').read()
         except:
