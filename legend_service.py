@@ -67,7 +67,7 @@ class LegendService:
                     "request": "GetLegendGraphic",
                     "layer": layer,
                     "format": format_param,
-                    "style": "default"
+                    "style": ""
                 }
                 req_params.update(params)
                 response = requests.get(
