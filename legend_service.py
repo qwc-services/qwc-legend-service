@@ -40,7 +40,7 @@ class LegendService:
         self.logger = logger
         self.layer_legend_images = Cache()
 
-    def get_legend(self, mapid, layer_param, format_param, params):
+    def get_legend(self, mapid, layer_param, format_param, params, access_token):
         """Return legend graphic for specified layer.
 
         :param str mapid: WMS service name
@@ -70,9 +70,14 @@ class LegendService:
                     "style": ""
                 }
                 req_params.update(params)
+
+                headers = {}
+                if access_token:
+                    headers['Authorization'] = "Bearer " + access_token
+
                 response = requests.get(
                     OGC_SERVER_URL + mapid, params=req_params,
-                    timeout=10
+                    headers=headers, timeout=10
                 )
                 self.logger.debug("Forwarding request to %s" % response.url)
 

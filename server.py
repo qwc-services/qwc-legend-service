@@ -1,6 +1,6 @@
 from flask import Flask
 from flask_restplus import Api, Resource, reqparse
-from flask_jwt_extended import jwt_optional
+from flask_jwt_extended import jwt_optional, get_jwt_identity, create_access_token
 
 from qwc_services_core.api import CaseInsensitiveArgument
 from qwc_services_core.jwt import jwt_manager
@@ -123,8 +123,9 @@ class Legend(Resource):
         # Filter empty params
         params = {k: v for k, v in params.items() if v}
 
+        access_token = create_access_token(get_jwt_identity())
         return legend_service.get_legend(
-            mapid, layer_param, format_param, params
+            mapid, layer_param, format_param, params, access_token
         )
 
 
