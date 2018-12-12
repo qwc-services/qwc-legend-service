@@ -17,7 +17,7 @@ api = Api(app, version='1.0', title='GetLegend API',
 app.config['ERROR_404_HELP'] = False
 
 # Setup the Flask-JWT-Extended extension
-jwt = jwt_manager(app)
+jwt = jwt_manager(app, api)
 
 # create Legend service
 legend_service = LegendService(app.logger)
