@@ -50,6 +50,7 @@ legend_parser.add_argument('layerfontcolor')
 legend_parser.add_argument('itemfontcolor')
 legend_parser.add_argument('layertitle')
 legend_parser.add_argument('rulelabel')
+legend_parser.add_argument('type')
 
 
 
@@ -84,6 +85,7 @@ class Legend(Resource):
     @api.param('itemfontcolor', 'Font color for layer item text')
     @api.param('layertitle', 'Whether to display layer title text')
     @api.param('rulelabel', 'Whether to display layer item text')
+    @api.param('type', 'The legend image type, either "thumbnail", or "default". Defaults to "default".')
     @api.expect(legend_parser)
     @jwt_optional
     def get(self, mapid):
@@ -94,6 +96,7 @@ class Legend(Resource):
         args = legend_parser.parse_args()
         layer_param = args['layer'] or ''
         format_param = args['format'] or 'image/png'
+        type = (args['type'] or 'default').lower()
         params = {
             "bbox": args['bbox'] or '',
             "crs": args['crs'] or '',
@@ -125,7 +128,7 @@ class Legend(Resource):
 
         access_token = create_access_token(get_jwt_identity())
         return legend_service.get_legend(
-            mapid, layer_param, format_param, params, access_token
+            mapid, layer_param, format_param, params, type, access_token
         )
 
 

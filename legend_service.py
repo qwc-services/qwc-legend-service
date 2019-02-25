@@ -40,13 +40,14 @@ class LegendService:
         self.logger = logger
         self.layer_legend_images = Cache()
 
-    def get_legend(self, mapid, layer_param, format_param, params, access_token):
+    def get_legend(self, mapid, layer_param, format_param, params, type, access_token):
         """Return legend graphic for specified layer.
 
         :param str mapid: WMS service name
         :param str layer_param: WMS layer names
         :param str format_param: Image format
         :param dict params: Other params to forward to QGIS Server
+        :param str type: The legend image type, either "default", "thumbnail" or "tooltip".
         """
         if format_param not in PIL_Formats:
             self.logger.warning(
@@ -57,8 +58,8 @@ class LegendService:
 
         imgdata = []
         for layer in layer_param.split(","):
-            legend_image = self.get_legend_image(mapid, layer)
-            if legend_image:
+            legend_image = self.get_legend_image(mapid, layer, type)
+            if legend_image is not None:
                 imgdata.append({"data": BytesIO(legend_image), "format": None})
             else:
                 req_params = {
@@ -152,8 +153,22 @@ class LegendService:
         data.seek(0)
         return send_file(data, mimetype=format_param)
 
-    def get_legend_image(self, mapid, layer):
-        try:
-            return open(os.path.join(QWC2_PATH, 'assets', 'legend', mapid, layer + '.png'), 'rb').read()
-        except:
-            return None
+    def get_legend_image(self, mapid, layer, type):
+        filenames = []
+        allowempty = False
+
+        if type == "thumbnail":
+            filenames.append(layer + "_thumbnail.png")
+        elif type == "tooltip":
+            allowempty = True
+
+        filenames.append(layer + '.png')
+
+        for filename in filenames:
+            try:
+                data = open(os.path.join(QWC2_PATH, 'assets', 'legend', mapid, filename), 'rb').read()
+                if data or allowempty:
+                    return data
+            except:
+                pass
+        return None
