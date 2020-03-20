@@ -50,6 +50,7 @@ legend_parser.add_argument('layerfontcolor')
 legend_parser.add_argument('itemfontcolor')
 legend_parser.add_argument('layertitle')
 legend_parser.add_argument('rulelabel')
+legend_parser.add_argument('transparent')
 legend_parser.add_argument('type')
 
 
@@ -85,6 +86,7 @@ class Legend(Resource):
     @api.param('itemfontcolor', 'Font color for layer item text')
     @api.param('layertitle', 'Whether to display layer title text')
     @api.param('rulelabel', 'Whether to display layer item text')
+    @api.param('transparent', 'Whether to set background transparency')
     @api.param('type', 'The legend image type, either "thumbnail", or "default". Defaults to "default".')
     @api.expect(legend_parser)
     @jwt_optional
@@ -121,6 +123,7 @@ class Legend(Resource):
             "layerfontcolor": args['layerfontcolor'] or '',
             "itemfontcolor": args['itemfontcolor'] or '',
             "layertitle": args['layertitle'] or '',
+            "transparent": args['transparent'] or '',
             "rulelabel": args['rulelabel'] or ''
         }
         # Filter empty params
