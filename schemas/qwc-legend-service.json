@@ -1,0 +1,141 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/qwc-services/qwc-legend-service/v2/schemas/qwc-legend-service.json",
+  "title": "QWC Legend Service",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "title": "JSON Schema",
+      "description": "Reference to JSON schema of this config",
+      "type": "string",
+      "format": "uri",
+      "default": "https://raw.githubusercontent.com/qwc-services/qwc-legend-service/v2/schemas/qwc-legend-service.json"
+    },
+    "service": {
+      "title": "Service name",
+      "type": "string",
+      "const": "legend"
+    },
+    "config": {
+      "title": "Config options",
+      "type": "object",
+      "properties": {
+        "default_qgis_server_url": {
+          "description": "Default base URL for forwarding WMS GetLegendGraphics requests",
+          "type": "string",
+          "format": "uri"
+        },
+        "legend_images_path": {
+          "description": "Path to legend images",
+          "type": "string"
+        }
+      },
+      "required": [
+        "default_qgis_server_url",
+        "legend_images_path"
+      ]
+    },
+    "resources": {
+      "title": "Resources",
+      "type": "object",
+      "properties": {
+        "wms_services": {
+          "title": "WMS services",
+          "type": "array",
+          "items": {
+            "title": "WMS service",
+            "description": "WMS service with nested layers and group layers",
+            "type": "object",
+            "properties": {
+              "name": {
+                "description": "WMS service name",
+                "type": "string"
+              },
+              "root_layer": {
+                "description": "Root layer of WMS (layer or group layer)",
+                "oneOf": [
+                  {"$ref": "#/definitions/layer"},
+                  {"$ref": "#/definitions/group_layer"}
+                ]
+              }
+            },
+            "required": [
+              "name",
+              "root_layer"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "required": [
+    "service",
+    "config",
+    "resources"
+  ],
+  "definitions": {
+    "layer": {
+      "title": "Layer",
+      "description": "Single layer",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "WMS layer name",
+          "type": "string"
+        },
+        "type": {
+          "description": "Layer type",
+          "type": "string",
+          "const": "layer"
+        },
+        "legend_image": {
+          "description": "Legend image path relative to 'legend_images_path'",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "group_layer": {
+      "title": "Group Layer",
+      "description": "Group layer with nested sublayers",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "WMS group layer name",
+          "type": "string"
+        },
+        "type": {
+          "description": "Layer type",
+          "type": "string",
+          "const": "layergroup"
+        },
+        "layers": {
+          "description": "Sublayers of this group layer (layers or group layers)",
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {"$ref": "#/definitions/layer"},
+              {"$ref": "#/definitions/group_layer"}
+            ]
+          }
+        },
+        "hide_sublayers": {
+          "description": "Hide sublayers of this group layer if set, to make the group layer look like a regular layer (Facade layer)",
+          "type": "boolean"
+        },
+        "legend_image": {
+          "description": "Legend image path relative to 'legend_images_path' (only if hide_sublayers is set)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "layers"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
