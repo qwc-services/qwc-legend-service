@@ -32,11 +32,12 @@ class LegendService:
     Acts as a proxy to a QGIS server.
     """
 
-    def __init__(self, logger):
+    def __init__(self, tenant, logger):
         """Constructor
 
         :param Logger logger: Application logger
         """
+        self.tenant = tenant
         self.logger = logger
         self.layer_legend_images = Cache()
 

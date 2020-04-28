@@ -4,13 +4,18 @@ from flask_jwt_extended import jwt_optional, get_jwt_identity, create_access_tok
 
 from qwc_services_core.api import CaseInsensitiveArgument
 from qwc_services_core.jwt import jwt_manager
+from qwc_services_core.tenant_handler import TenantHandler
 from legend_service import LegendService
 
 
 # Flask application
 app = Flask(__name__)
 api = Api(app, version='1.0', title='GetLegend API',
-          description='API for QWC GetLegend service',
+          description="""API for QWC GetLegend service
+
+The legend service delivers layer legends using an API based on
+WMS GetLegendGraphic.
+          """,
           default_label='Legend operations', doc='/api/')
 
 # disable verbose 404 error message
@@ -19,8 +24,19 @@ app.config['ERROR_404_HELP'] = False
 # Setup the Flask-JWT-Extended extension
 jwt = jwt_manager(app)
 
-# create Legend service
-legend_service = LegendService(app.logger)
+# create tenant handler
+tenant_handler = TenantHandler(app.logger)
+
+
+def legend_service_handler():
+    """Get or create a LegendService instance for a tenant."""
+    tenant = tenant_handler.tenant()
+    handler = tenant_handler.handler('legend', 'legend', tenant)
+    if handler is None:
+        handler = tenant_handler.register_handler(
+            'legend', tenant, LegendService(tenant, app.logger))
+    return handler
+
 
 # request parser
 legend_parser = reqparse.RequestParser(argument_class=CaseInsensitiveArgument)
@@ -52,7 +68,6 @@ legend_parser.add_argument('layertitle')
 legend_parser.add_argument('rulelabel')
 legend_parser.add_argument('transparent')
 legend_parser.add_argument('type')
-
 
 
 # routes
@@ -130,6 +145,7 @@ class Legend(Resource):
         params = {k: v for k, v in params.items() if v}
 
         access_token = create_access_token(get_jwt_identity())
+        legend_service = legend_service_handler()
         return legend_service.get_legend(
             mapid, layer_param, format_param, params, type, access_token
         )
