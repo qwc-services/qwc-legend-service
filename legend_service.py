@@ -6,10 +6,9 @@ from flask import Response, send_file
 import requests
 
 from qwc_services_core.cache import Cache
+from qwc_services_core.runtime_config import RuntimeConfig
 
 
-OGC_SERVER_URL = os.environ.get('OGC_SERVICE_URL',
-                                'http://localhost:5013/').rstrip("/") + "/"
 QWC2_PATH = os.environ.get('QWC2_PATH', 'qwc2/')
 
 PIL_Formats = {
@@ -39,6 +38,15 @@ class LegendService:
         """
         self.tenant = tenant
         self.logger = logger
+
+        config_handler = RuntimeConfig("legend", logger)
+        config = config_handler.tenant_config(tenant)
+
+        # get internal QGIS server URL from config
+        self.qgis_server_url = config.get(
+            'default_qgis_server_url', 'http://localhost:8001/ows/'
+        ).rstrip('/') + '/'
+
         self.layer_legend_images = Cache()
 
     def get_legend(self, mapid, layer_param, format_param, params, type, access_token):
@@ -78,7 +86,7 @@ class LegendService:
                     headers['Authorization'] = "Bearer " + access_token
 
                 response = requests.get(
-                    OGC_SERVER_URL + mapid, params=req_params,
+                    self.qgis_server_url + mapid, params=req_params,
                     headers=headers, timeout=10
                 )
                 self.logger.debug("Forwarding request to %s" % response.url)
