@@ -147,7 +147,8 @@ class Legend(Resource):
         access_token = create_access_token(get_jwt_identity())
         legend_service = legend_service_handler()
         return legend_service.get_legend(
-            mapid, layer_param, format_param, params, type, access_token
+            mapid, layer_param, format_param, params, type, access_token,
+            get_jwt_identity()
         )
 
 
