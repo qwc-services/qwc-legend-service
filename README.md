@@ -81,6 +81,73 @@ Example:
 **Note**: the `legend_image` path for custom legend graphics is relative to `legend_images_path` and may contain subdirectories
 
 
+### Permissions
+
+* [JSON schema](https://github.com/qwc-services/qwc-services-core/blob/master/schemas/qwc-services-permissions.json)
+* File location: `$CONFIG_PATH/<tenant>/permissions.json`
+
+Example:
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/qwc-services/qwc-services-core/master/schemas/qwc-services-permissions.json",
+  "users": [
+    {
+      "name": "demo",
+      "groups": ["demo"],
+      "roles": []
+    }
+  ],
+  "groups": [
+    {
+      "name": "demo",
+      "roles": ["demo"]
+    }
+  ],
+  "roles": [
+    {
+      "role": "public",
+      "permissions": {
+        "wms_services": [
+          {
+            "name": "qwc_demo",
+            "layers": [
+              {
+                "name": "qwc_demo"
+              },
+              {
+                "name": "edit_demo"
+              },
+              {
+                "name": "edit_points"
+              },
+              {
+                "name": "edit_lines"
+              },
+              {
+                "name": "edit_polygons"
+              },
+              {
+                "name": "geographic_lines"
+              },
+              {
+                "name": "country_names"
+              },
+              {
+                "name": "states_provinces"
+              },
+              {
+                "name": "countries"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+
 ### Legend images
 
 Place your custom legend images in `legend_images_path` and set the `legend_image` paths in the layer configurations accordingly.

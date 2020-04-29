@@ -5,6 +5,7 @@ from PIL import Image
 from flask import Response, send_file
 import requests
 
+from qwc_services_core.permissions_reader import PermissionsReader
 from qwc_services_core.runtime_config import RuntimeConfig
 
 
@@ -48,6 +49,7 @@ class LegendService:
         self.legend_images_path = config.get('legend_images_path', 'legends/')
 
         self.resources = self.load_resources(config)
+        self.permissions_handler = PermissionsReader(tenant, logger)
 
     def get_legend(self, mapid, layer_param, format_param, params, type,
                    access_token, identity):
@@ -60,18 +62,32 @@ class LegendService:
         :param str type: The legend image type, either "default", "thumbnail" or "tooltip".
         :param obj identity: User identity
         """
+        if not self.wms_permitted(mapid, identity):
+            # map unknown or not permitted
+            return self.service_exception(
+                'MapNotDefined',
+                'Map "%s" does not exist or is not permitted' % mapid
+            )
+
         if format_param not in PIL_Formats:
             self.logger.warning(
                 "Unsupported format requested, falling back to image/png"
             )
             format_param = "image/png"
 
-        # filter layers by permissions and replace group layers
-        # with permitted sublayers
+        # get permitted resources
         requested_layers = layer_param.split(',')
         permitted_resources = self.permitted_resources(mapid, identity)
         permitted_layers = permitted_resources['permitted_layers']
+        public_layers = permitted_resources['public_layers']
         group_layers = permitted_resources['groups_to_expand']
+        # filter layers by permissions
+        requested_layers = [
+            layer for layer in requested_layers
+            if layer in public_layers
+        ]
+        # replace group layers containing custom legends with permitted
+        # sublayers
         expanded_layers = self.expand_group_layers(
             requested_layers, group_layers, permitted_layers
         )
@@ -121,17 +137,11 @@ class LegendService:
 
         if len(imgdata) == 0:
             # layer not found or faulty
-            return Response(
-                (
-                    '<ServiceExceptionReport version="1.3.0">\n'
-                    ' <ServiceException code="LayerNotDefined">'
-                    'Layer "%s" does not exist'
-                    '</ServiceException>\n'
-                    '</ServiceExceptionReport>' % layer_param
-                ),
-                content_type='text/xml; charset=utf-8',
-                status=200
+            return self.service_exception(
+                'LayerNotDefined',
+                'Layer "%s" does not exist or is not permitted' % layer_param
             )
+
         # If just one image, return it
         elif len(imgdata) == 1:
             # Convert to requested format if necessary
@@ -175,6 +185,23 @@ class LegendService:
         image.save(data, PIL_Formats[format_param])
         data.seek(0)
         return send_file(data, mimetype=format_param)
+
+    def service_exception(self, code, message):
+        """Create ServiceExceptionReport XML response
+
+        :param str code: ServiceException code
+        :param str message: ServiceException text
+        """
+        return Response(
+            (
+                '<ServiceExceptionReport version="1.3.0">\n'
+                ' <ServiceException code="%s">%s</ServiceException>\n'
+                '</ServiceExceptionReport>'
+                % (code, message)
+            ),
+            content_type='text/xml; charset=utf-8',
+            status=200
+        )
 
     def expand_group_layers(self, requested_layers, groups_to_expand,
                             permitted_layers):
@@ -259,6 +286,8 @@ class LegendService:
         for wms in config.resources().get('wms_services', []):
             # collect WMS layers
             resources = {
+                # root layer name
+                'root_layer': wms['root_layer']['name'],
                 # public layers without hidden sublayers: [<layers>]
                 'public_layers': [],
                 # available layers including hidden sublayers: [<layers>]
@@ -317,14 +346,14 @@ class LegendService:
 
             resources['group_layers'][layer['name']] = sublayers
 
-            if sublayers_have_custom_legend:
-                # group has sublayer with custom legend image
-                resources['groups_to_expand'][layer['name']] = sublayers
-
             if layer.get('hide_sublayers') and layer.get('legend_image'):
                 # set custom legend image for group with hidden sublayers
+                # Note: overrides any custom legend image of sublayers
                 resources['legend_images'][layer['name']] = \
                     layer.get('legend_image')
+            elif sublayers_have_custom_legend:
+                # group has sublayer with custom legend image
+                resources['groups_to_expand'][layer['name']] = sublayers
         else:
             # layer
             if layer.get('legend_image'):
@@ -332,19 +361,114 @@ class LegendService:
                 resources['legend_images'][layer['name']] = \
                     layer.get('legend_image')
 
+    def wms_permitted(self, service_name, identity):
+        """Return whether WMS is available and permitted.
+
+        :param str service_name: Service name
+        :param obj identity: User identity
+        """
+        if self.resources['wms_services'].get(service_name):
+            # get permissions for WMS
+            wms_permissions = self.permissions_handler.resource_permissions(
+                'wms_services', identity, service_name
+            )
+            if wms_permissions:
+                return True
+
+        return False
+
     def permitted_resources(self, service_name, identity):
         """Return permitted resources for a legend service.
 
         :param str service_name: Service name
         :param obj identity: User identity
         """
+        if not self.resources['wms_services'].get(service_name):
+            # WMS service unknown
+            return {}
+
+        # get permissions for WMS
+        wms_permissions = self.permissions_handler.resource_permissions(
+            'wms_services', identity, service_name
+        )
+        if not wms_permissions:
+            # WMS not permitted
+            return {}
+
         wms_resources = self.resources['wms_services'][service_name].copy()
 
-        # TODO: filter by permissions
-        permitted_layers = wms_resources['public_layers']
+        # get available layers
+        available_layers = wms_resources['available_layers']
+
+        # combine permissions
+        permitted_layers = set()
+        for permission in wms_permissions:
+            for layer in permission['layers']:
+                name = layer['name']
+                if name in available_layers:
+                    permitted_layers.add(name)
+
+        # filter by permissions
+
+        # public layers
+        public_layers = [
+            layer for layer in wms_resources['public_layers']
+            if layer in permitted_layers
+        ]
+
+        # collect restricted group layers
+        restricted_group_layers = {}
+        self.collect_restricted_group_layers(
+            wms_resources['root_layer'], wms_resources['group_layers'],
+            permitted_layers, restricted_group_layers
+        )
+        # merge with groups to expand
         groups_to_expand = wms_resources['groups_to_expand']
+        for group, allowed_sublayers in restricted_group_layers.items():
+            # update with allowed layers
+            groups_to_expand[group] = allowed_sublayers
 
         return {
-            'permitted_layers': permitted_layers,
+            'permitted_layers': sorted(list(permitted_layers)),
+            'public_layers': public_layers,
             'groups_to_expand': groups_to_expand
         }
+
+    def collect_restricted_group_layers(self, layer, group_layers,
+                                        permitted_layers,
+                                        restricted_group_layers):
+        """Recursively collect group layers with restricted sublayers.
+
+        :param str layer: Layer name
+        :param obj group_layers: Lookup for group layers
+        :param list(str) permitted_layers: List of permitted layer names
+        :Param obj restricted_group_layers: Partial lookup for restricted
+                                            group layers
+        """
+        if layer in group_layers:
+            # group layer
+
+            # collect sublayers
+            sublayers = []
+            sublayers_restricted = False
+            for sublayer in group_layers[layer]:
+                if sublayer in permitted_layers:
+                    # add permitted layer
+                    sublayers.append(sublayer)
+
+                # recursively collect sublayer
+                self.collect_restricted_group_layers(
+                    sublayer, group_layers, permitted_layers,
+                    restricted_group_layers
+                )
+                if (
+                    sublayer not in permitted_layers or
+                    sublayer in restricted_group_layers
+                ):
+                    # sublayer is restricted
+                    # or is a group containing such sublayers
+                    sublayers_restricted |= True
+
+            if sublayers_restricted:
+                # group has restricted sublayers
+                restricted_group_layers[layer] = sublayers
