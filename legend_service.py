@@ -52,7 +52,7 @@ class LegendService:
         self.permissions_handler = PermissionsReader(tenant, logger)
 
     def get_legend(self, mapid, layer_param, format_param, params, type,
-                   access_token, identity):
+                   identity):
         """Return legend graphic for specified layer.
 
         :param str mapid: WMS service name
@@ -133,14 +133,8 @@ class LegendService:
                     "style": ""
                 }
                 req_params.update(params)
-
-                headers = {}
-                if access_token:
-                    headers['Authorization'] = "Bearer " + access_token
-
                 response = requests.get(
-                    self.qgis_server_url + mapid, params=req_params,
-                    headers=headers, timeout=10
+                    self.qgis_server_url + mapid, params=req_params, timeout=10
                 )
                 self.logger.debug("Forwarding request to %s" % response.url)
 
