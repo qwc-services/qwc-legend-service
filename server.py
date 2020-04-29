@@ -10,8 +10,8 @@ from legend_service import LegendService
 
 # Flask application
 app = Flask(__name__)
-api = Api(app, version='1.0', title='GetLegend API',
-          description="""API for QWC GetLegend service
+api = Api(app, version='1.0', title='Legend service API',
+          description="""API for QWC Legend service.
 
 The legend service delivers layer legends using an API based on
 WMS GetLegendGraphic.
@@ -47,6 +47,7 @@ legend_parser.add_argument('crs')
 legend_parser.add_argument('scale')
 legend_parser.add_argument('width')
 legend_parser.add_argument('height')
+legend_parser.add_argument('dpi')
 legend_parser.add_argument('boxspace')
 legend_parser.add_argument('layerspace')
 legend_parser.add_argument('layertitlespace')
@@ -82,6 +83,7 @@ class Legend(Resource):
     @api.param('scale', 'The scale to consider for generating the legend')
     @api.param('width', 'The map width')
     @api.param('height', 'The map height')
+    @api.param('dpi', 'DPI')
     @api.param('boxspace', 'Space between legend frame and content (mm)')
     @api.param('layerspace', 'Vertical space between layers (mm)')
     @api.param('layertitlespace', 'Vertical space between layer title and items following (mm)')
@@ -120,6 +122,7 @@ class Legend(Resource):
             "scale": args['scale'] or '',
             "width": args['width'] or '',
             "height": args['height'] or '',
+            "dpi": args['dpi'] or '',
             "boxspace": args['boxspace'] or '',
             "layerspace": args['layerspace'] or '',
             "layertitlespace": args['layertitlespace'] or '',

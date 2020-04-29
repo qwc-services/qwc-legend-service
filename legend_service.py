@@ -95,11 +95,34 @@ class LegendService:
         self.logger.debug("Requested layers: %s" % requested_layers)
         self.logger.debug("Expanded layers:  %s" % expanded_layers)
 
+        dpi = params.get('dpi')
         imgdata = []
         for layer in expanded_layers:
             legend_image = self.get_legend_image(mapid, layer, type)
             if legend_image is not None:
-                imgdata.append({"data": BytesIO(legend_image), "format": None})
+                if dpi and dpi != '90':
+                    try:
+                        # scale image to requested DPI
+                        img = Image.open(BytesIO(legend_image))
+                        scale = float(dpi) / 90.0
+                        new_size = (
+                            int(img.width * scale), int(img.height * scale)
+                        )
+                        img = img.resize(new_size, Image.ANTIALIAS)
+                        output = BytesIO()
+                        img.save(output, PIL_Formats[format_param])
+                        imgdata.append({"data": output, "format": None})
+                    except Exception as e:
+                        self.logger.error(
+                            "Could not resize image for %s:\n%s" % (layer, e)
+                        )
+                        imgdata.append(
+                            {"data": BytesIO(legend_image), "format": None}
+                        )
+                else:
+                    imgdata.append({
+                        "data": BytesIO(legend_image), "format": None
+                    })
             else:
                 req_params = {
                     "service": "WMS",
