@@ -3,6 +3,7 @@ from flask_restplus import Api, Resource, reqparse
 from flask_jwt_extended import jwt_optional, get_jwt_identity
 
 from qwc_services_core.api import CaseInsensitiveArgument
+from qwc_services_core.app import app_nocache
 from qwc_services_core.jwt import jwt_manager
 from qwc_services_core.tenant_handler import TenantHandler
 from legend_service import LegendService
@@ -10,6 +11,7 @@ from legend_service import LegendService
 
 # Flask application
 app = Flask(__name__)
+app_nocache(app)
 api = Api(app, version='1.0', title='Legend service API',
           description="""API for QWC Legend service.
 
