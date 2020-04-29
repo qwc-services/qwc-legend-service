@@ -72,8 +72,8 @@ legend_parser.add_argument('type')
 
 
 # routes
-@api.route('/<mapid>')
-@api.param('mapid', 'The WMS service map name')
+@api.route('/<path:service_name>')
+@api.param('service_name', 'Service name corresponding to WMS, e.g. `qwc_demo`')
 class Legend(Resource):
     @api.doc('legend')
     @api.param('layer', 'The layer name')
@@ -107,7 +107,7 @@ class Legend(Resource):
     @api.param('type', 'The legend image type, either "thumbnail", or "default". Defaults to "default".')
     @api.expect(legend_parser)
     @jwt_optional
-    def get(self, mapid):
+    def get(self, service_name):
         """Get legend graphic
 
         Return legend graphic for specified layer
@@ -149,7 +149,8 @@ class Legend(Resource):
 
         legend_service = legend_service_handler()
         return legend_service.get_legend(
-            mapid, layer_param, format_param, params, type, get_jwt_identity()
+            service_name, layer_param, format_param, params, type,
+            get_jwt_identity()
         )
 
 

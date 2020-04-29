@@ -51,22 +51,22 @@ class LegendService:
         self.resources = self.load_resources(config)
         self.permissions_handler = PermissionsReader(tenant, logger)
 
-    def get_legend(self, mapid, layer_param, format_param, params, type,
+    def get_legend(self, service_name, layer_param, format_param, params, type,
                    identity):
         """Return legend graphic for specified layer.
 
-        :param str mapid: WMS service name
+        :param str service_name: Service name
         :param str layer_param: WMS layer names
         :param str format_param: Image format
         :param dict params: Other params to forward to QGIS Server
         :param str type: The legend image type, either "default", "thumbnail" or "tooltip".
         :param obj identity: User identity
         """
-        if not self.wms_permitted(mapid, identity):
+        if not self.wms_permitted(service_name, identity):
             # map unknown or not permitted
             return self.service_exception(
                 'MapNotDefined',
-                'Map "%s" does not exist or is not permitted' % mapid
+                'Map "%s" does not exist or is not permitted' % service_name
             )
 
         if format_param not in PIL_Formats:
@@ -77,7 +77,7 @@ class LegendService:
 
         # get permitted resources
         requested_layers = layer_param.split(',')
-        permitted_resources = self.permitted_resources(mapid, identity)
+        permitted_resources = self.permitted_resources(service_name, identity)
         permitted_layers = permitted_resources['permitted_layers']
         public_layers = permitted_resources['public_layers']
         group_layers = permitted_resources['groups_to_expand']
@@ -98,7 +98,7 @@ class LegendService:
         dpi = params.get('dpi')
         imgdata = []
         for layer in expanded_layers:
-            legend_image = self.get_legend_image(mapid, layer, type)
+            legend_image = self.get_legend_image(service_name, layer, type)
             if legend_image is not None:
                 if dpi and dpi != '90':
                     try:
@@ -134,7 +134,8 @@ class LegendService:
                 }
                 req_params.update(params)
                 response = requests.get(
-                    self.qgis_server_url + mapid, params=req_params, timeout=10
+                    self.qgis_server_url + service_name, params=req_params,
+                    timeout=10
                 )
                 self.logger.debug("Forwarding request to %s" % response.url)
 
@@ -250,17 +251,18 @@ class LegendService:
 
         return expanded_layers
 
-    def get_legend_image(self, mapid, layer, type):
+    def get_legend_image(self, service_name, layer, type):
         """Return any custom legend image for a layer.
 
-        :param str mapid: Service name
+        :param str service_name: Service name
         :param str layer: WMS Layer name
         :param str type: Legend image type (default|thumbnail|tooltip)
         """
         image_data = None
 
         # get lookup for custom legend images
-        legend_images = self.resources['wms_services'][mapid]['legend_images']
+        wms_resources = self.resources['wms_services'][service_name]
+        legend_images = wms_resources['legend_images']
         if layer not in legend_images:
             # layer has no custom legend image
             return None
