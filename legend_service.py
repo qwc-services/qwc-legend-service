@@ -5,11 +5,8 @@ from PIL import Image
 from flask import Response, send_file
 import requests
 
-from qwc_services_core.cache import Cache
 from qwc_services_core.runtime_config import RuntimeConfig
 
-
-QWC2_PATH = os.environ.get('QWC2_PATH', 'qwc2/')
 
 PIL_Formats = {
     "image/bmp": "BMP",
@@ -51,8 +48,6 @@ class LegendService:
         self.legend_images_path = config.get('legend_images_path', 'legends/')
 
         self.resources = self.load_resources(config)
-
-        self.layer_legend_images = Cache()
 
     def get_legend(self, mapid, layer_param, format_param, params, type,
                    access_token, identity):
@@ -212,24 +207,46 @@ class LegendService:
         return expanded_layers
 
     def get_legend_image(self, mapid, layer, type):
-        filenames = []
-        allowempty = False
+        """Return any custom legend image for a layer.
 
-        if type == "thumbnail":
-            filenames.append(layer + "_thumbnail.png")
-        elif type == "tooltip":
-            allowempty = True
+        :param str mapid: Service name
+        :param str layer: WMS Layer name
+        :param str type: Legend image type (default|thumbnail|tooltip)
+        """
+        image_data = None
 
-        filenames.append(layer + '.png')
+        # get lookup for custom legend images
+        legend_images = self.resources['wms_services'][mapid]['legend_images']
+        if layer not in legend_images:
+            # layer has no custom legend image
+            return None
 
-        for filename in filenames:
-            try:
-                data = open(os.path.join(QWC2_PATH, 'assets', 'legend', mapid, filename), 'rb').read()
-                if data or allowempty:
-                    return data
-            except:
-                pass
-        return None
+        # TODO: legend image types
+
+        try:
+            image_path = os.path.join(
+                self.legend_images_path, legend_images[layer]
+            )
+            if os.path.isfile(image_path):
+                self.logger.debug(
+                    "Loading legend image '%s' for layer '%s'" %
+                    (image_path, layer)
+                )
+                # load image file
+                with open(image_path, 'rb') as f:
+                    image_data = f.read()
+            else:
+                self.logger.warning(
+                    "Could not find legend image '%s' for layer '%s'" %
+                    (image_path, layer)
+                )
+        except Exception as e:
+            self.logger.error(
+                "Could not load legend image '%s' for layer '%s'" %
+                (image_path, layer)
+            )
+
+        return image_data
 
     def load_resources(self, config):
         """Load service resources from config.
