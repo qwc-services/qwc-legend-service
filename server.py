@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, jsonify
 from flask_restplus import Api, Resource, reqparse
 from flask_jwt_extended import jwt_optional, get_jwt_identity
 
@@ -154,6 +154,18 @@ class Legend(Resource):
             service_name, layer_param, format_param, params, type,
             get_jwt_identity()
         )
+
+
+""" readyness probe endpoint """
+@app.route("/ready", methods=['GET'])
+def ready():
+    return jsonify({"status": "OK"})
+
+
+""" liveness probe endpoint """
+@app.route("/healthz", methods=['GET'])
+def healthz():
+    return jsonify({"status": "OK"})
 
 
 # local webserver
