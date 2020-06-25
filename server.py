@@ -1,5 +1,5 @@
 from flask import Flask, jsonify
-from flask_restplus import Api, Resource, reqparse
+from flask_restx import Api, Resource, reqparse
 from flask_jwt_extended import jwt_optional, get_jwt_identity
 
 from qwc_services_core.api import CaseInsensitiveArgument
