@@ -1,10 +1,9 @@
 from flask import Flask, jsonify
 from flask_restx import Api, Resource, reqparse
-from flask_jwt_extended import jwt_optional, get_jwt_identity
 
 from qwc_services_core.api import CaseInsensitiveArgument
 from qwc_services_core.app import app_nocache
-from qwc_services_core.jwt import jwt_manager
+from qwc_services_core.auth import auth_manager, optional_auth, get_auth_user
 from qwc_services_core.tenant_handler import TenantHandler
 from legend_service import LegendService
 
@@ -23,8 +22,7 @@ WMS GetLegendGraphic.
 # disable verbose 404 error message
 app.config['ERROR_404_HELP'] = False
 
-# Setup the Flask-JWT-Extended extension
-jwt = jwt_manager(app)
+auth = auth_manager(app, api)
 
 # create tenant handler
 tenant_handler = TenantHandler(app.logger)
@@ -108,7 +106,7 @@ class Legend(Resource):
     @api.param('transparent', 'Whether to set background transparency')
     @api.param('type', 'The legend image type, either "thumbnail", or "default". Defaults to "default".')
     @api.expect(legend_parser)
-    @jwt_optional
+    @optional_auth
     def get(self, service_name):
         """Get legend graphic
 
@@ -152,7 +150,7 @@ class Legend(Resource):
         legend_service = legend_service_handler()
         return legend_service.get_legend(
             service_name, layer_param, format_param, params, type,
-            get_jwt_identity()
+            get_auth_user()
         )
 
 
