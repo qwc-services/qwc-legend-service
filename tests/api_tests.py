@@ -29,8 +29,10 @@ class ApiTestCase(unittest.TestCase):
 
     def test_default_legendgraphic(self):
         params = {
+            'SERVICE': 'WMS',
+            'REQUEST': 'GetLegendGraphic',
             'format': 'image/png',
-            'layer': 'edit_polygons'
+            'LAYER': 'edit_polygons'
         }
         response = self.app.get('/qwc_demo?' + urlencode(params), headers=self.jwtHeader())
         self.assertEqual(200, response.status_code, "Status code is not OK")
@@ -47,8 +49,10 @@ class ApiTestCase(unittest.TestCase):
     def test_custom_legendgraphic(self):
         # NOTE: edit_points has a custom legend graphic image, the response is the actual image, and not the response of the dummy qgis server
         params = {
+            'SERVICE': 'WMS',
+            'REQUEST': 'GetLegendGraphic',
             'format': 'image/png',
-            'layer': 'edit_points'
+            'LAYER': 'edit_points'
         }
         response = self.app.get('/qwc_demo?' + urlencode(params), headers=self.jwtHeader())
         self.assertEqual(200, response.status_code, "Status code is not OK")
