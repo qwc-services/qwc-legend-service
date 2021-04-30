@@ -26,13 +26,12 @@
           "format": "uri"
         },
         "legend_images_path": {
-          "description": "Path to legend images",
+          "description": "Path to legend images (required if using 'legend_image')",
           "type": "string"
         }
       },
       "required": [
-        "default_qgis_server_url",
-        "legend_images_path"
+        "default_qgis_server_url"
       ]
     },
     "resources": {
@@ -91,6 +90,11 @@
         "legend_image": {
           "description": "Legend image path relative to 'legend_images_path'",
           "type": "string"
+        },
+        "legend_image_base64": {
+          "description": "Legend image in Base64 encoding",
+          "type": "string",
+          "contentEncoding": "base64"
         }
       },
       "required": [
@@ -129,6 +133,11 @@
         "legend_image": {
           "description": "Legend image path relative to 'legend_images_path' (only if hide_sublayers is set)",
           "type": "string"
+        },
+        "legend_image_base64": {
+          "description": "Legend image in Base64 encoding (only if hide_sublayers is set)",
+          "type": "string",
+          "contentEncoding": "base64"
         }
       },
       "required": [
