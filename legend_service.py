@@ -260,6 +260,25 @@ class LegendService:
         """
         image_data = None
 
+        # attempt to match legend image by filename
+        filenames = []
+        allowempty = False
+
+        if type == "thumbnail":
+            filenames.append(layer + "_thumbnail.png")
+        elif type == "tooltip":
+            allowempty = True
+
+        filenames.append(layer + '.png')
+
+        for filename in filenames:
+            try:
+                data = open(os.path.join(self.legend_images_path, service_name, filename), 'rb').read()
+                if data or allowempty:
+                    return data
+            except:
+                pass
+
         # get lookup for custom legend images
         wms_resources = self.resources['wms_services'][service_name]
         legend_images = wms_resources['legend_images']
