@@ -30,7 +30,7 @@ Example:
   "config": {
     // QGIS Server URL
     "default_qgis_server_url": "http://localhost:8001/ows/",
-    // base path to legend images
+    // base path to legend images (required if using 'legend_image')
     "legend_images_path": "/PATH/TO/LEGENDS/"
   },
   "resources": {
@@ -46,12 +46,12 @@ Example:
                 {
                   "name": "edit_points",
                   // using custom legend image
-                  "legend_image": "edit_demo.png"
+                  "legend_image": "edit_points.png"
                 },
                 {
                   "name": "edit_lines",
-                  // using custom legend image
-                  "legend_image": "edit_lines.png"
+                  // using custom legend image in Base64 encoding
+                  "legend_image_base64": "iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAHUlEQVQI12NgwAEYGRgY/tdjiDYyMOHSQQ8JnAAAUUoCDCaibn8AAAAASUVORK5CYII="
                 },
                 {
                   // using WMS GetLegendGraphics by default

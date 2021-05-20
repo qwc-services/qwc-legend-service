@@ -1,5 +1,8 @@
+import base64
 from io import BytesIO
 import os
+import tempfile
+import uuid
 
 from PIL import Image
 from flask import Response, send_file
@@ -47,6 +50,10 @@ class LegendService:
 
         # get path to legend images from config
         self.legend_images_path = config.get('legend_images_path', 'legends/')
+
+        # temporary target dir for any Base64 encoded legend images
+        # NOTE: this dir will be cleaned up automatically on reload
+        self.images_temp_dir = None
 
         self.resources = self.load_resources(config)
         self.permissions_handler = PermissionsReader(tenant, logger)
@@ -289,6 +296,7 @@ class LegendService:
         # TODO: legend image types
 
         try:
+            # NOTE: uses absolute path for extracted Base64 encoded images
             image_path = os.path.join(
                 self.legend_images_path, legend_images[layer]
             )
@@ -307,8 +315,8 @@ class LegendService:
                 )
         except Exception as e:
             self.logger.error(
-                "Could not load legend image '%s' for layer '%s'" %
-                (image_path, layer)
+                "Could not load legend image '%s' for layer '%s':\n%s" %
+                (image_path, layer, e)
             )
 
         return image_data
@@ -384,20 +392,69 @@ class LegendService:
 
             resources['group_layers'][layer['name']] = sublayers
 
-            if layer.get('hide_sublayers') and layer.get('legend_image'):
+            if layer.get('hide_sublayers') and (
+                layer.get('legend_image') or layer.get('legend_image_base64')
+            ):
                 # set custom legend image for group with hidden sublayers
                 # Note: overrides any custom legend image of sublayers
-                resources['legend_images'][layer['name']] = \
-                    layer.get('legend_image')
+                image_path = self.legend_image_path(layer)
+                if image_path is not None:
+                    resources['legend_images'][layer['name']] = image_path
             elif sublayers_have_custom_legend:
                 # group has sublayer with custom legend image
                 resources['groups_to_expand'][layer['name']] = sublayers
         else:
             # layer
-            if layer.get('legend_image'):
+            if layer.get('legend_image') or layer.get('legend_image_base64'):
                 # set custom legend image
-                resources['legend_images'][layer['name']] = \
-                    layer.get('legend_image')
+                image_path = self.legend_image_path(layer)
+                if image_path is not None:
+                    resources['legend_images'][layer['name']] = image_path
+
+    def legend_image_path(self, layer):
+        """Return path to custom legend image
+        (either from file or from Base64 encoded image).
+
+        :param obj layer: Layer or group layer
+        """
+        image_path = None
+
+        if layer.get('legend_image'):
+            # relative path to legend_images_path
+            image_path = layer.get('legend_image')
+        elif layer.get('legend_image_base64'):
+            # absolute path to images_temp_dir
+            image_path = self.extract_base64_legend_image(layer)
+
+        return image_path
+
+    def extract_base64_legend_image(self, layer):
+        """Extract Base64 encoded legend image to file and return its path.
+
+        :param obj layer: Layer or group layer
+        """
+        image_path = None
+
+        try:
+            if self.images_temp_dir is None:
+                # create temporary target dir
+                self.images_temp_dir = tempfile.TemporaryDirectory(
+                    prefix='qwc-legend-service-'
+                )
+
+            # decode and save as image file
+            filename = "%s-%s.png" % (layer['name'], uuid.uuid4())
+            image_path = os.path.join(self.images_temp_dir.name, filename)
+            with open(image_path, 'wb') as f:
+                f.write(base64.b64decode(layer.get('legend_image_base64')))
+        except Exception as e:
+            image_path = None
+            self.logger.error(
+                "Could not extract Base64 encoded legend image for layer '%s':"
+                "\n%s" % (layer['name'], e)
+            )
+
+        return image_path
 
     def wms_permitted(self, service_name, identity):
         """Return whether WMS is available and permitted.
