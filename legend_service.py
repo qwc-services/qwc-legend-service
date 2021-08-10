@@ -24,6 +24,11 @@ PIL_Formats = {
     "image/webp": "WebP"
 }
 
+FORMATS_WITH_ALPHA = set([
+    "image/png",
+    "image/webp"
+])
+
 
 class LegendService:
     """LegendService class
@@ -117,7 +122,8 @@ class LegendService:
                         )
                         img = img.resize(new_size, Image.ANTIALIAS)
                         output = BytesIO()
-                        img.save(output, PIL_Formats[format_param])
+                        # NOTE: save as PNG to preserve any alpha channel
+                        img.save(output, "PNG")
                         imgdata.append({"data": output, "format": None})
                     except Exception as e:
                         self.logger.error(
@@ -174,10 +180,15 @@ class LegendService:
                 output = BytesIO()
                 try:
                     imgdata[0]["data"].seek(0)
-                    Image.open(imgdata[0]["data"]).save(
-                        output, PIL_Formats[format_param]
+                    image = Image.open(imgdata[0]["data"])
+                    if not self.format_has_alpha(format_param):
+                        image = self.convert_img_to_rgb(image)
+                    image.save(output, PIL_Formats[format_param])
+                except Exception as e:
+                    self.logger.error(
+                        "Could not convert image to %s:\n%s"
+                        % (format_param, e)
                     )
-                except:
                     # Empty 1x1 image
                     Image.new("RGB", (1, 1), (255, 255, 255)).save(
                         output, PIL_Formats[format_param]
@@ -194,12 +205,18 @@ class LegendService:
         for entry in imgdata:
             try:
                 entry["image"] = Image.open(entry["data"])
+                if not self.format_has_alpha(format_param):
+                    entry["image"] = self.convert_img_to_rgb(entry["image"])
                 width = max(width, entry["image"].width)
                 height += entry["image"].height
             except:
                 entry["image"] = None
 
-        image = Image.new("RGBA", (width, height), (255, 255, 255, 255))
+        if self.format_has_alpha(format_param):
+            image = Image.new("RGBA", (width, height), (255, 255, 255, 255))
+        else:
+            image = Image.new("RGB", (width, height), (255, 255, 255))
+
         y = 0
         for entry in imgdata:
             if entry["image"]:
@@ -320,6 +337,25 @@ class LegendService:
             )
 
         return image_data
+
+    def format_has_alpha(self, format_param):
+        """Return whether image format supports alpha channel.
+
+        :param string format_param: Image format as media type
+        """
+        return format_param in FORMATS_WITH_ALPHA
+
+    def convert_img_to_rgb(self, image):
+        """Return image as RGB, converting from RGBA if necessary.
+
+        :param Image image: Input image
+        """
+        if image.mode == 'RGBA':
+            # remove alpha channel by compositing with white background
+            background = Image.new("RGBA", image.size, (255, 255, 255, 255))
+            image = Image.alpha_composite(background, image).convert("RGB")
+
+        return image
 
     def load_resources(self, config):
         """Load service resources from config.
