@@ -1,5 +1,5 @@
 [![](https://github.com/qwc-services/qwc-legend-service/workflows/build/badge.svg)](https://github.com/qwc-services/qwc-legend-service/actions)
-[![](https://img.shields.io/docker/pulls/sourcepole/qwc-legend-service)](https://hub.docker.com/r/sourcepole/qwc-legend-service)
+[![docker](https://img.shields.io/docker/v/sourcepole/qwc-legend-service?label=Docker%20image&sort=semver)](https://hub.docker.com/r/sourcepole/qwc-legend-service)
 
 QWC Legend Service
 ==================
