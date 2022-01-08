@@ -1,4 +1,4 @@
-FROM sourcepole/qwc-uwsgi-base:alpine-v2021.12.16
+FROM sourcepole/qwc-uwsgi-base:alpine-v2022.01.08
 
 # Required build dependencies for pillow
 RUN apk add --virtual build-deps build-base linux-headers python3-dev
