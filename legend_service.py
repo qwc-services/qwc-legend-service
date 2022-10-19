@@ -291,6 +291,7 @@ class LegendService:
         if type == "thumbnail":
             filenames.append(layer + "_thumbnail.png")
         elif type == "tooltip":
+            filenames.append(layer + "_tooltip.png")
             allowempty = True
 
         filenames.append(layer + '.png')
