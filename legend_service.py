@@ -289,16 +289,23 @@ class LegendService:
         allowempty = False
 
         if type == "thumbnail":
-            filenames.append(layer + "_thumbnail.png")
+            filenames.append(os.path.join(service_name, layer + "_thumbnail.png"))
         elif type == "tooltip":
-            filenames.append(layer + "_tooltip.png")
+            filenames.append(os.path.join(service_name, layer + "_tooltip.png"))
             allowempty = True
 
-        filenames.append(layer + '.png')
+        filenames.append(os.path.join(service_name, layer + '.png'))
+
+        if type == "thumbnail":
+            filenames.append("default_thumbnail.png")
+        elif type == "tooltip":
+            filenames.append("default_tooltip.png")
+            allowempty = True
+        filenames.append('default.png')
 
         for filename in filenames:
             try:
-                data = open(os.path.join(self.legend_images_path, service_name, filename), 'rb').read()
+                data = open(os.path.join(self.legend_images_path, filename), 'rb').read()
                 if data or allowempty:
                     return data
             except:
