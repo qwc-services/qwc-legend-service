@@ -1,9 +1,9 @@
-FROM sourcepole/qwc-uwsgi-base:alpine-v2023.05.12
+FROM sourcepole/qwc-uwsgi-base:alpine-v2023.06.07
 
 ADD . /srv/qwc_service
 
 # git: Required for pip with git repos
-# postgresql-dev g++ python3-dev: Required for psycopg2-binary
+# postgresql-dev g++ python3-dev: Required for psycopg2
 # zlib-dev jpeg-dev: Required for pillow
 RUN \
     apk add --no-cache --update --virtual runtime-deps postgresql-libs libjpeg zlib && \
