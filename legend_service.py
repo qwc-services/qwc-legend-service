@@ -436,15 +436,13 @@ class LegendService:
 
             resources['group_layers'][layer['name']] = sublayers
 
-            if layer.get('hide_sublayers') and (
-                layer.get('legend_image') or layer.get('legend_image_base64')
-            ):
+            if layer.get('legend_image') or layer.get('legend_image_base64'):
                 # set custom legend image for group with hidden sublayers
                 # Note: overrides any custom legend image of sublayers
                 image_path = self.legend_image_path(layer)
                 if image_path is not None:
                     resources['legend_images'][layer['name']] = image_path
-            elif sublayers_have_custom_legend:
+            elif layer.get('hide_sublayers') or sublayers_have_custom_legend:
                 # group has sublayer with custom legend image
                 resources['groups_to_expand'][layer['name']] = sublayers
         else:
