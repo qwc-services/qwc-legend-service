@@ -189,7 +189,7 @@ Create a virtual environment:
 
 Without system packages:
 
-    virtualenv --python=/usr/bin/python3 .venv
+    python3 -m venv .venv
 
 Activate virtual environment:
 
