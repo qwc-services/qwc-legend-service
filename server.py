@@ -3,7 +3,7 @@ from flask_restx import Api, Resource, reqparse
 
 from qwc_services_core.api import CaseInsensitiveArgument
 from qwc_services_core.app import app_nocache
-from qwc_services_core.auth import auth_manager, optional_auth, get_auth_user
+from qwc_services_core.auth import auth_manager, optional_auth, get_identity
 from qwc_services_core.tenant_handler import TenantHandler
 from legend_service import LegendService
 
@@ -150,7 +150,7 @@ class Legend(Resource):
         legend_service = legend_service_handler()
         return legend_service.get_legend(
             service_name, layer_param, format_param, params, type,
-            get_auth_user()
+            get_identity()
         )
 
 
