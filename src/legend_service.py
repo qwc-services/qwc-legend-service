@@ -148,7 +148,7 @@ class LegendService:
                 req_params.update(params)
                 response = requests.get(
                     self.qgis_server_url + service_name, params=req_params,
-                    timeout=10
+                    timeout=30
                 )
                 self.logger.debug("Forwarding request to %s" % response.url)
 

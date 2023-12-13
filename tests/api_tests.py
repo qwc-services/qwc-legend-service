@@ -9,6 +9,7 @@ from flask.testing import FlaskClient
 from flask_jwt_extended import JWTManager, create_access_token
 
 import server
+JWTManager(server.app)
 
 
 class ApiTestCase(unittest.TestCase):
@@ -17,7 +18,6 @@ class ApiTestCase(unittest.TestCase):
     def setUp(self):
         server.app.testing = True
         self.app = FlaskClient(server.app, Response)
-        JWTManager(server.app)
 
     def tearDown(self):
         pass
