@@ -5,7 +5,6 @@ on: [push, pull_request]
 jobs:
     test:
       runs-on: ubuntu-latest
-      if: ${{ false }}  # disable for now
       steps:
 
       - uses: actions/checkout@master
@@ -19,13 +18,14 @@ jobs:
       - name: Start demo database
         run: |
           cd qwc-docker
-          sed -i 's|host=qwc-postgis|host=localhost|' pg_service-write.conf
-          sed -i 's|port=5432|port=5439|' pg_service-write.conf
-          cp pg_service-write.conf ~/.pg_service.conf
+          cp pg_service.conf ~/.pg_service.conf
+          sed -i 's|host=qwc-postgis|host=localhost|g' ~/.pg_service.conf
+          sed -i 's|port=5432|port=5439|g' ~/.pg_service.conf
+          sed -Ei "s|^(\s*POSTGRES_PASSWORD:).*$|\1 'waej7WuoOoth0wor'|" docker-compose-example.yml
           sed -i 's|qwc-qgis-server|localhost:8001|' volumes/config/default/legendConfig.json
           sed -i "s|\/legends\/|$PWD\/volumes\/legends\/|" volumes/config/default/legendConfig.json
           sed -i -e 's|# ports:|ports:|g' -e 's|#   - "127.0.0.1|  - "127.0.0.1|g' docker-compose-example.yml
-          docker-compose -f docker-compose-example.yml up -d qwc-postgis qwc-qgis-server
+          docker-compose -f docker-compose-example.yml up -d qwc-postgis qwc-config-db-migrate qwc-qgis-server
 
       - name: Setting up python 3.12
         uses: actions/setup-python@v2
