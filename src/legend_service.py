@@ -52,6 +52,7 @@ class LegendService:
         self.qgis_server_url = config.get(
             'default_qgis_server_url', 'http://localhost:8001/ows/'
         ).rstrip('/') + '/'
+        self.legend_default_font_size = config.get("legend_default_font_size")
 
         # get path to legend images from config
         self.legend_images_path = config.get('legend_images_path', 'legends/')
@@ -146,6 +147,13 @@ class LegendService:
                     "style": ""
                 }
                 req_params.update(params)
+                if self.legend_default_font_size:
+                    if 'layerfontsize' not in req_params:
+                        req_params['layerfontsize'] = \
+                            self.legend_default_font_size
+                    if 'itemfontsize' not in req_params:
+                        req_params['itemfontsize'] = \
+                            self.legend_default_font_size
                 response = requests.get(
                     self.qgis_server_url + service_name, params=req_params,
                     timeout=30

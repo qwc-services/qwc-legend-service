@@ -24,6 +24,10 @@
           "description": "Default base URL for forwarding WMS GetLegendGraphics requests",
           "type": "string"
         },
+        "legend_default_font_size": {
+          "description": "Default font size for GetLegendGraphic request",
+          "type": "number"
+        },
         "legend_images_path": {
           "description": "Path to legend images (required if using 'legend_image')",
           "type": "string"
