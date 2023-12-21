@@ -41,6 +41,7 @@ def legend_service_handler():
 # request parser
 legend_parser = reqparse.RequestParser(argument_class=CaseInsensitiveArgument)
 legend_parser.add_argument('layer', required=True)
+legend_parser.add_argument('styles')
 legend_parser.add_argument('format')
 legend_parser.add_argument('bbox')
 legend_parser.add_argument('crs')
@@ -77,6 +78,7 @@ legend_parser.add_argument('type')
 class Legend(Resource):
     @api.doc('legend')
     @api.param('layer', 'The layer name')
+    @api.param('styles', 'The layer style')
     @api.param('format', 'The image format', default='image/png')
     @api.param('bbox', 'The extent to consider for generating the legend')
     @api.param('crs', 'The CRS of the specified extent')
@@ -114,6 +116,7 @@ class Legend(Resource):
         """
         args = legend_parser.parse_args()
         layer_param = args['layer'] or ''
+        styles_param = args['styles'] or ''
         format_param = args['format'] or 'image/png'
         type = (args['type'] or 'default').lower()
         params = {
@@ -149,7 +152,7 @@ class Legend(Resource):
 
         legend_service = legend_service_handler()
         return legend_service.get_legend(
-            service_name, layer_param, format_param, params, type,
+            service_name, layer_param, styles_param, format_param, params, type,
             get_identity()
         )
 

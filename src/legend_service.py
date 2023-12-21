@@ -64,12 +64,13 @@ class LegendService:
         self.resources = self.load_resources(config)
         self.permissions_handler = PermissionsReader(tenant, logger)
 
-    def get_legend(self, service_name, layer_param, format_param, params, type,
+    def get_legend(self, service_name, layer_param, styles_param, format_param, params, type,
                    identity):
         """Return legend graphic for specified layer.
 
         :param str service_name: Service name
         :param str layer_param: WMS layer names
+        :param str styles_param: WMS layer styles
         :param str format_param: Image format
         :param dict params: Other params to forward to QGIS Server
         :param str type: The legend image type, either "default", "thumbnail" or "tooltip".
@@ -90,28 +91,29 @@ class LegendService:
 
         # get permitted resources
         requested_layers = layer_param.split(',')
+        requested_layer_styles = self.padded_styles(requested_layers, styles_param)
         permitted_resources = self.permitted_resources(service_name, identity)
         permitted_layers = permitted_resources['permitted_layers']
         public_layers = permitted_resources['public_layers']
         group_layers = permitted_resources['groups_to_expand']
         # filter layers by permissions
-        requested_layers = [
-            layer for layer in requested_layers
-            if layer in public_layers
+        requested_layer_styles = [
+            entry for entry in requested_layer_styles
+            if entry['layer'] in public_layers
         ]
         # replace group layers containing custom legends with permitted
         # sublayers
-        expanded_layers = self.expand_group_layers(
-            requested_layers, group_layers, permitted_layers
+        expanded_layer_styles = self.expand_group_layers(
+            requested_layer_styles, group_layers, permitted_layers
         )
 
         self.logger.debug("Requested layers: %s" % requested_layers)
-        self.logger.debug("Expanded layers:  %s" % expanded_layers)
+        self.logger.debug("Expanded layers:  %s" % expanded_layer_styles)
 
         dpi = params.get('dpi')
         imgdata = []
-        for layer in expanded_layers:
-            legend_image = self.get_legend_image(service_name, layer, type)
+        for layer_style in expanded_layer_styles:
+            legend_image = self.get_legend_image(service_name, layer_style['layer'], type)
             if legend_image is not None:
                 if dpi and dpi != '90':
                     try:
@@ -128,7 +130,7 @@ class LegendService:
                         imgdata.append({"data": output, "format": None})
                     except Exception as e:
                         self.logger.error(
-                            "Could not resize image for %s:\n%s" % (layer, e)
+                            "Could not resize image for %s:\n%s" % (layer_style['layer'], e)
                         )
                         imgdata.append(
                             {"data": BytesIO(legend_image), "format": None}
@@ -142,9 +144,9 @@ class LegendService:
                     "service": "WMS",
                     "version": "1.3.0",
                     "request": "GetLegendGraphic",
-                    "layer": layer,
+                    "layer": layer_style['layer'],
                     "format": format_param,
-                    "style": ""
+                    "style": layer_style['style']
                 }
                 req_params.update(params)
                 if self.legend_default_font_size:
@@ -236,6 +238,30 @@ class LegendService:
         data.seek(0)
         return send_file(data, mimetype=format_param)
 
+    def padded_styles(self, requested_layers, styles_param):
+        """Complement requested styles to match number of requested layers.
+
+        :param list(str) requested_layers: List of requested layer names
+        :param str styles_param: Value of STYLES request parameter
+        """
+        requested_layers_styles = []
+
+        requested_styles = []
+        if styles_param:
+            requested_styles = styles_param.split(',')
+
+        for i, layer in enumerate(requested_layers):
+            if i < len(requested_styles):
+                style = requested_styles[i]
+            else:
+                style = ''
+            requested_layers_styles.append({
+                'layer': layer,
+                'style': style
+            })
+
+        return requested_layers_styles
+
     def service_exception(self, code, message):
         """Create ServiceExceptionReport XML response
 
@@ -253,33 +279,33 @@ class LegendService:
             status=200
         )
 
-    def expand_group_layers(self, requested_layers, groups_to_expand,
+    def expand_group_layers(self, requested_layer_styles, groups_to_expand,
                             permitted_layers):
         """Recursively filter layers by permissions and replace group layers
         with permitted sublayers and return resulting layer list.
 
-        :param list(str) requested_layers: List of requested layer names
+        :param list(str) requested_layer_styles: List of requested layer and style names
         :param obj groups_to_expand: Lookup for group layers with sublayers
                                      that have custom legends or are restricted
         :param list(str) permitted_layers: List of permitted layer names
         """
         expanded_layers = []
 
-        for layer in requested_layers:
-            if layer in permitted_layers:
-                if layer in groups_to_expand:
+        for entry in requested_layer_styles:
+            if entry['layer'] in permitted_layers:
+                if entry['layer'] in groups_to_expand:
                     # expand sublayers
                     sublayers = []
                     for sublayer in groups_to_expand.get(layer):
                         if sublayer in permitted_layers:
-                            sublayers.append(sublayer)
+                            sublayers.append({'layer': sublayer, 'style': ''})
 
                     expanded_layers += self.expand_group_layers(
                         sublayers, groups_to_expand, permitted_layers
                     )
                 else:
                     # leaf layer or full group layer
-                    expanded_layers.append(layer)
+                    expanded_layers.append(entry)
 
         return expanded_layers
 
