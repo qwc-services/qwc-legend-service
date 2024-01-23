@@ -296,7 +296,7 @@ class LegendService:
                 if entry['layer'] in groups_to_expand:
                     # expand sublayers
                     sublayers = []
-                    for sublayer in groups_to_expand.get(layer):
+                    for sublayer in groups_to_expand.get(entry['layer']):
                         if sublayer in permitted_layers:
                             sublayers.append({'layer': sublayer, 'style': ''})
 
