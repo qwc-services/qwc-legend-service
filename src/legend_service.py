@@ -56,7 +56,7 @@ class LegendService:
         self.legend_default_font_size = config.get("legend_default_font_size")
 
         # get path to legend images from config
-        self.legend_images_path = config.get('legend_images_path', 'legends/')
+        self.legend_images_path = config.get('legend_images_path', '/legends/')
 
         # temporary target dir for any Base64 encoded legend images
         # NOTE: this dir will be cleaned up automatically on reload
