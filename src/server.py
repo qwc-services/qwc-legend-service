@@ -1,4 +1,6 @@
-from flask import Flask, jsonify
+import requests
+
+from flask import Flask, jsonify, json
 from flask_restx import Api, Resource, reqparse
 
 from qwc_services_core.api import CaseInsensitiveArgument
@@ -36,6 +38,30 @@ def legend_service_handler():
         handler = tenant_handler.register_handler(
             'legend', tenant, LegendService(tenant, app.logger))
     return handler
+
+
+def get_identity_or_auth(legend_service):
+    identity = get_identity()
+    if not identity and legend_service.basic_auth_login_url:
+        # Check for basic auth
+        auth = request.authorization
+        if auth:
+            headers = {}
+            if tenant_handler.tenant_header:
+                # forward tenant header
+                headers[tenant_handler.tenant_header] = tenant_handler.tenant()
+            for login_url in legend_service.basic_auth_login_url:
+                app.logger.debug(f"Checking basic auth via {login_url}")
+                data = {'username': auth.username, 'password': auth.password}
+                resp = requests.post(login_url, data=data, headers=headers)
+                if resp.ok:
+                    json_resp = json.loads(resp.text)
+                    app.logger.debug(json_resp)
+                    return json_resp.get('identity')
+            # Return WWW-Authenticate header, e.g. for browser password prompt
+            # raise Unauthorized(
+            #     www_authenticate='Basic realm="Login Required"')
+    return identity
 
 
 # request parser
@@ -153,7 +179,7 @@ class Legend(Resource):
         legend_service = legend_service_handler()
         return legend_service.get_legend(
             service_name, layer_param, styles_param, format_param, params, type,
-            get_identity()
+            get_identity_or_auth(legend_service)
         )
 
 

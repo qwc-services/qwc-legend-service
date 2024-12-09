@@ -52,6 +52,7 @@ class LegendService:
         self.qgis_server_url = config.get(
             'default_qgis_server_url', 'http://localhost:8001/ows/'
         ).rstrip('/') + '/'
+        self.basic_auth_login_url = config.get('basic_auth_login_url')
         self.legend_default_font_size = config.get("legend_default_font_size")
 
         # get path to legend images from config

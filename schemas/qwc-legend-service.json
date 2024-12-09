@@ -31,6 +31,13 @@
         "legend_images_path": {
           "description": "Path to legend images (required if using 'legend_image')",
           "type": "string"
+        },
+        "basic_auth_login_url": {
+          "description": "Login verification URL for requests with basic auth. Example: `http://qwc-auth-service:9090/verify_login`. Default: `null`",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
