@@ -183,23 +183,10 @@ Sample request:
 Development
 -----------
 
-Create a virtual environment:
+Install dependencies and run service:
 
-    virtualenv --python=/usr/bin/python3 --system-site-packages .venv
+    uv run src/server.py
 
-Without system packages:
+With config path:
 
-    python3 -m venv .venv
-
-Activate virtual environment:
-
-    source .venv/bin/activate
-
-Install requirements:
-
-    pip install -r requirements.txt
-    pip install flask_cors
-
-Start local service:
-
-    CONFIG_PATH=/PATH/TO/CONFIGS/ python src/server.py
+    CONFIG_PATH=/PATH/TO/CONFIGS/ uv run src/server.py
