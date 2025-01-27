@@ -331,6 +331,54 @@ class LegendService:
 
         filenames.append(os.path.join(service_name, layer + '.png'))
 
+        for filename in filenames:
+            try:
+                image_path = os.path.join(self.legend_images_path, filename)
+                self.logger.debug(
+                    "Looking for legend image '%s' for layer '%s'..." % (image_path, layer)
+                )
+                data = open(os.path.join(self.legend_images_path, filename), 'rb').read()
+                if data or allowempty:
+                    self.logger.debug(
+                        "Loading legend image '%s' for layer '%s'" % (image_path, layer)
+                    )
+                    return data
+            except:
+                pass
+
+        # get lookup for custom legend images
+        wms_resources = self.resources['wms_services'][service_name]
+        legend_images = wms_resources['legend_images']
+        if layer in legend_images:
+            # TODO: legend image types
+            try:
+                # NOTE: uses absolute path for extracted Base64 encoded images
+                image_path = os.path.join(
+                    self.legend_images_path, legend_images[layer]
+                )
+                self.logger.debug(
+                    "Looking for legend image '%s' (defined in resources) for layer '%s'..." % (image_path, layer)
+                )
+                if os.path.isfile(image_path):
+                    self.logger.debug(
+                        "Loading legend image '%s' for layer '%s'" % (image_path, layer)
+                    )
+                    # load image file
+                    with open(image_path, 'rb') as f:
+                        return f.read()
+                else:
+                    self.logger.warning(
+                        "Could not find legend image '%s' for layer '%s'" %
+                        (image_path, layer)
+                    )
+            except Exception as e:
+                self.logger.error(
+                    "Could not load legend image '%s' for layer '%s':\n%s" %
+                    (image_path, layer, e)
+                )
+
+        # Look for fallback default images
+        filenames = []
         if type == "thumbnail":
             filenames.append("default_thumbnail.png")
         elif type == "tooltip":
@@ -340,46 +388,21 @@ class LegendService:
 
         for filename in filenames:
             try:
+                image_path = os.path.join(self.legend_images_path, filename)
+                self.logger.debug(
+                    "Looking for legend image '%s' for layer '%s'..." % (image_path, layer)
+                )
                 data = open(os.path.join(self.legend_images_path, filename), 'rb').read()
                 if data or allowempty:
+                    self.logger.debug(
+                        "Loading legend image '%s' for layer '%s'" % (image_path, layer)
+                    )
                     return data
             except:
                 pass
 
-        # get lookup for custom legend images
-        wms_resources = self.resources['wms_services'][service_name]
-        legend_images = wms_resources['legend_images']
-        if layer not in legend_images:
-            # layer has no custom legend image
-            return None
-
-        # TODO: legend image types
-
-        try:
-            # NOTE: uses absolute path for extracted Base64 encoded images
-            image_path = os.path.join(
-                self.legend_images_path, legend_images[layer]
-            )
-            if os.path.isfile(image_path):
-                self.logger.debug(
-                    "Loading legend image '%s' for layer '%s'" %
-                    (image_path, layer)
-                )
-                # load image file
-                with open(image_path, 'rb') as f:
-                    image_data = f.read()
-            else:
-                self.logger.warning(
-                    "Could not find legend image '%s' for layer '%s'" %
-                    (image_path, layer)
-                )
-        except Exception as e:
-            self.logger.error(
-                "Could not load legend image '%s' for layer '%s':\n%s" %
-                (image_path, layer, e)
-            )
-
-        return image_data
+        self.logger.debug("No custom legend image of type '%s' found for layer '%s'" % (type, layer))
+        return None
 
     def format_has_alpha(self, format_param):
         """Return whether image format supports alpha channel.
