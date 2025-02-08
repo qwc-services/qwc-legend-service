@@ -6,7 +6,8 @@ from flask_restx import Api, Resource, reqparse
 from qwc_services_core.api import CaseInsensitiveArgument
 from qwc_services_core.app import app_nocache
 from qwc_services_core.auth import auth_manager, optional_auth, get_identity
-from qwc_services_core.tenant_handler import TenantHandler
+from qwc_services_core.tenant_handler import (
+    TenantHandler, TenantPrefixMiddleware, TenantSessionInterface)
 from legend_service import LegendService
 
 
@@ -28,6 +29,8 @@ auth = auth_manager(app, api)
 
 # create tenant handler
 tenant_handler = TenantHandler(app.logger)
+app.wsgi_app = TenantPrefixMiddleware(app.wsgi_app)
+app.session_interface = TenantSessionInterface()
 
 
 def legend_service_handler():
