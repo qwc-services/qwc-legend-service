@@ -1,6 +1,6 @@
 import requests
 
-from flask import Flask, jsonify, json
+from flask import Flask, jsonify, json, request
 from flask_restx import Api, Resource, reqparse
 
 from qwc_services_core.api import CaseInsensitiveArgument
