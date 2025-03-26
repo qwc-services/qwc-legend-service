@@ -59,26 +59,23 @@ class LegendService:
         # get path to legend images from config
         self.legend_images_path = config.get('legend_images_path', '/legends/')
 
-        # temporary target dir for any Base64 encoded legend images
-        # NOTE: this dir will be cleaned up automatically on reload
-        self.images_temp_dir = None
-
         self.resources = self.load_resources(config)
         self.permissions_handler = PermissionsReader(tenant, logger)
 
-    def get_legend(self, service_name, layer_param, styles_param, format_param, params, type,
+    def get_legend(self, service_name, layers_param, styles_param, format_param, params, type,
                    identity):
         """Return legend graphic for specified layer.
 
         :param str service_name: Service name
-        :param str layer_param: WMS layer names
+        :param str layers_param: WMS layer names
         :param str styles_param: WMS layer styles
         :param str format_param: Image format
         :param dict params: Other params to forward to QGIS Server
         :param str type: The legend image type, either "default", "thumbnail" or "tooltip".
         :param obj identity: User identity
         """
-        if not self.wms_permitted(service_name, identity):
+        permissions = self.wms_permissions(service_name, identity)
+        if not permissions:
             # map unknown or not permitted
             return self.service_exception(
                 'MapNotDefined',
@@ -91,36 +88,49 @@ class LegendService:
             )
             format_param = "image/png"
 
-        # get permitted resources
-        requested_layers = layer_param.split(',')
-        requested_layer_styles = self.padded_styles(requested_layers, styles_param)
-        permitted_resources = self.permitted_resources(service_name, identity)
-        permitted_layers = permitted_resources['permitted_layers']
-        public_layers = permitted_resources['public_layers']
-        group_layers = permitted_resources['groups_to_expand']
-        # filter layers by permissions
-        requested_layer_styles = [
-            entry for entry in requested_layer_styles
-            if entry['layer'] in public_layers
-        ]
-        # replace group layers containing custom legends with permitted
-        # sublayers
-        expanded_layer_styles = self.expand_group_layers(
-            requested_layer_styles, group_layers, permitted_layers
-        )
+        # get requested layers/styles
+        layers = layers_param.split(',')
+        styles = styles_param.split(',')
+        styles.extend([''] * (len(layers) - len(styles)))
+        requested_layer_styles =  [{'layer': l, 'style': s} for l, s in zip(layers, styles)]
 
-        self.logger.debug("Requested layers: %s" % requested_layers)
-        self.logger.debug("Expanded layers:  %s" % expanded_layer_styles)
+        self.logger.debug("Requested layers: %s" % str(requested_layer_styles))
+
+        # Collect permitted layers
+        permitted_layers = set()
+        for permission in permissions:
+            for layer in permission['layers']:
+                permitted_layers.add(layer['name'])
+        self.logger.debug("Permitted layers: %s" % str(permitted_layers))
+        resource_entries = self.resources['wms_services'][service_name]['layers']
+
+        # Filter hidden layers (i.e. children of facade groups) from requested layers
+        requested_layer_styles = list(filter(
+            lambda entry: not resource_entries[entry['layer']]['hidden'],
+            requested_layer_styles
+        ))
+
+        # Expand layers / filter restricted layers / resolve custom legend images
+        expanded_layer_styles = []
+        for entry in requested_layer_styles:
+            self.expand_layer(entry, resource_entries, permitted_layers, expanded_layer_styles, service_name, type)
+
+        self.logger.debug("Expanded layers: %s" % str(
+            list(map(lambda e: e | {
+                "custom_legend_image": "<bytes>" if e["custom_legend_image"] else None
+                }, expanded_layer_styles
+            ))
+        ))
 
         dpi = params.get('dpi')
         imgdata = []
         for layer_style in expanded_layer_styles:
-            legend_image = self.get_legend_image(service_name, layer_style['layer'], type)
-            if legend_image is not None:
+            custom_legend_image = layer_style['custom_legend_image']
+            if custom_legend_image is not None:
                 if dpi and dpi != '90':
                     try:
                         # scale image to requested DPI
-                        img = Image.open(BytesIO(legend_image))
+                        img = Image.open(BytesIO(custom_legend_image))
                         scale = float(dpi) / 90.0
                         new_size = (
                             int(img.width * scale), int(img.height * scale)
@@ -135,11 +145,11 @@ class LegendService:
                             "Could not resize image for %s:\n%s" % (layer_style['layer'], e)
                         )
                         imgdata.append(
-                            {"data": BytesIO(legend_image), "format": None}
+                            {"data": BytesIO(custom_legend_image), "format": None}
                         )
                 else:
                     imgdata.append({
-                        "data": BytesIO(legend_image), "format": None
+                        "data": BytesIO(custom_legend_image), "format": None
                     })
             else:
                 req_params = {
@@ -240,30 +250,6 @@ class LegendService:
         data.seek(0)
         return send_file(data, mimetype=format_param)
 
-    def padded_styles(self, requested_layers, styles_param):
-        """Complement requested styles to match number of requested layers.
-
-        :param list(str) requested_layers: List of requested layer names
-        :param str styles_param: Value of STYLES request parameter
-        """
-        requested_layers_styles = []
-
-        requested_styles = []
-        if styles_param:
-            requested_styles = styles_param.split(',')
-
-        for i, layer in enumerate(requested_layers):
-            if i < len(requested_styles):
-                style = requested_styles[i]
-            else:
-                style = ''
-            requested_layers_styles.append({
-                'layer': layer,
-                'style': style
-            })
-
-        return requested_layers_styles
-
     def service_exception(self, code, message):
         """Create ServiceExceptionReport XML response
 
@@ -281,102 +267,86 @@ class LegendService:
             status=200
         )
 
-    def expand_group_layers(self, requested_layer_styles, groups_to_expand,
-                            permitted_layers):
-        """Recursively filter layers by permissions and replace group layers
-        with permitted sublayers and return resulting layer list.
+    def expand_layer(self, requested_layer_style, resource_entries, permitted_layers, expanded_layer_styles, service_name, type):
+        """ Expand the requested layer if it is a group, and resolve any custom legend images
 
-        :param list(str) requested_layer_styles: List of requested layer and style names
-        :param obj groups_to_expand: Lookup for group layers with sublayers
-                                     that have custom legends or are restricted
-        :param list(str) permitted_layers: List of permitted layer names
+        :param dict requested_layer_style: The requested layer
+        :param dict resource_entries: The layer resource entries
+        :param set permitted_layers: The permitted layers
+        :param list expanded_layer_styles: The result expanded layer styles
+        :param str service_name: The WMS service name
+        :param str type: The legend image type
         """
-        expanded_layers = []
+        layer = requested_layer_style['layer']
+        if layer not in permitted_layers:
+            return False
 
-        for entry in requested_layer_styles:
-            if entry['layer'] in permitted_layers:
-                if entry['layer'] in groups_to_expand:
-                    # expand sublayers
-                    sublayers = []
-                    for sublayer in groups_to_expand.get(entry['layer']):
-                        if sublayer in permitted_layers:
-                            sublayers.append({'layer': sublayer, 'style': ''})
+        resource_entry = resource_entries[layer]
+        if 'sublayers' in resource_entry:
+            have_custom_images = False
+            group_layer_styles = []
+            for sublayer in resource_entry['sublayers']:
 
-                    expanded_layers += self.expand_group_layers(
-                        sublayers, groups_to_expand, permitted_layers
-                    )
-                else:
-                    # leaf layer or full group layer
-                    expanded_layers.append(entry)
+                have_custom_images |= self.expand_layer(
+                    {'layer': sublayer, 'style': requested_layer_style['style']},
+                     resource_entries, permitted_layers, group_layer_styles,
+                     service_name, type
+                )
 
-        return expanded_layers
+            # NOTE: hide_sublayers: see somap#691
+            if have_custom_images or resource_entries['hide_sublayers']:
+                expanded_layer_styles.extend(group_layer_styles)
+            else:
+                requested_layer_style.update({'custom_legend_image': None})
+                expanded_layer_styles.append(requested_layer_style)
+            return have_custom_images
+        else:
+            # Resolve custom images
+            custom_image = self.get_custom_image(layer, resource_entry, service_name, type)
+            requested_layer_style.update({'custom_legend_image': custom_image})
+            expanded_layer_styles.append(requested_layer_style)
+            return custom_image != None
 
-    def get_legend_image(self, service_name, layer, type):
-        """Return any custom legend image for a layer.
-
-        :param str service_name: Service name
-        :param str layer: WMS Layer name
-        :param str type: Legend image type (default|thumbnail|tooltip)
+    def get_custom_image(self, layer, resource_entry, service_name, type):
+        """ Return the custom legend image for the specified layer, if found
+            - Below legend_images_path/<service_name>/<layer><suffix>.png
+            - Below legend_images_path/<resource_entry[legend_image]>
+            - As base64 in <resource_entry[legend_image_base64]>
+        :param str layer: The layer name
+        :param dict resource_entry: The layer resource entry
+        :param str service_name: The WMS service name
+        :param str type: The legend image type
         """
-        image_data = None
-
-        # attempt to match legend image by filename
+        # Check for image in legend_images_path
         filenames = []
-        allowempty = False
-
         if type == "thumbnail":
             filenames.append(os.path.join(service_name, layer + "_thumbnail.png"))
         elif type == "tooltip":
             filenames.append(os.path.join(service_name, layer + "_tooltip.png"))
-            allowempty = True
-
         filenames.append(os.path.join(service_name, layer + '.png'))
 
-        for filename in filenames:
-            try:
-                image_path = os.path.join(self.legend_images_path, filename)
-                self.logger.debug(
-                    "Looking for legend image '%s' for layer '%s'..." % (image_path, layer)
-                )
-                data = open(os.path.join(self.legend_images_path, filename), 'rb').read()
-                if data or allowempty:
-                    self.logger.debug(
-                        "Loading legend image '%s' for layer '%s'" % (image_path, layer)
-                    )
-                    return data
-            except:
-                pass
+        if resource_entry['legend_image']:
+            filenames.append(resource_entry['legend_image'])
 
-        # get lookup for custom legend images
-        wms_resources = self.resources['wms_services'][service_name]
-        legend_images = wms_resources['legend_images']
-        if layer in legend_images:
-            # TODO: legend image types
+        for filename in filenames:
+            image_path = os.path.join(self.legend_images_path, filename)
+            self.logger.debug(
+                "Looking for legend image '%s' for layer '%s'..." % (image_path, layer)
+            )
             try:
-                # NOTE: uses absolute path for extracted Base64 encoded images
-                image_path = os.path.join(
-                    self.legend_images_path, legend_images[layer]
-                )
+                data = open(os.path.join(self.legend_images_path, filename), 'rb').read()
+            except:
+                data = None
+            if data:
                 self.logger.debug(
-                    "Looking for legend image '%s' (defined in resources) for layer '%s'..." % (image_path, layer)
+                    "Loading legend image '%s' for layer '%s'" % (image_path, layer)
                 )
-                if os.path.isfile(image_path):
-                    self.logger.debug(
-                        "Loading legend image '%s' for layer '%s'" % (image_path, layer)
-                    )
-                    # load image file
-                    with open(image_path, 'rb') as f:
-                        return f.read()
-                else:
-                    self.logger.warning(
-                        "Could not find legend image '%s' for layer '%s'" %
-                        (image_path, layer)
-                    )
-            except Exception as e:
-                self.logger.error(
-                    "Could not load legend image '%s' for layer '%s':\n%s" %
-                    (image_path, layer, e)
-                )
+                return data
+
+        # Check for base64 image in resource entry
+        if resource_entry['legend_image_base64']:
+            self.logger.debug("Decoded base64 custom legend for layer '%s'" % (layer))
+            return base64.b64decode(resource_entry['legend_image_base64'])
 
         # Look for fallback default images
         filenames = []
@@ -386,21 +356,20 @@ class LegendService:
             filenames.append("default_tooltip.png")
             allowempty = True
         filenames.append('default.png')
-
         for filename in filenames:
+            image_path = os.path.join(self.legend_images_path, filename)
+            self.logger.debug(
+                "Looking for legend image '%s' for layer '%s'..." % (image_path, layer)
+            )
             try:
-                image_path = os.path.join(self.legend_images_path, filename)
-                self.logger.debug(
-                    "Looking for legend image '%s' for layer '%s'..." % (image_path, layer)
-                )
                 data = open(os.path.join(self.legend_images_path, filename), 'rb').read()
-                if data or allowempty:
-                    self.logger.debug(
-                        "Loading legend image '%s' for layer '%s'" % (image_path, layer)
-                    )
-                    return data
             except:
-                pass
+                data = None
+            if data:
+                self.logger.debug(
+                    "Loading legend image '%s' for layer '%s'" % (image_path, layer)
+                )
+                return data
 
         self.logger.debug("No custom legend image of type '%s' found for layer '%s'" % (type, layer))
         return None
@@ -431,240 +400,50 @@ class LegendService:
         """
         wms_services = {}
 
-        # collect service resources
+        # Collect WMS service layers
         for wms in config.resources().get('wms_services', []):
-            # collect WMS layers
-            resources = {
-                # root layer name
-                'root_layer': wms['root_layer']['name'],
-                # public layers without hidden sublayers: [<layers>]
-                'public_layers': [],
-                # available layers including hidden sublayers: [<layers>]
-                'available_layers': [],
-                # lookup for complete group layers
-                # sub layers ordered from top to bottom:
-                #     {<group>: [<sub layers]}
-                'group_layers': {},
-                # lookup for group layers containing layers with
-                # custom legend images
-                # sub layers ordered from top to bottom:
-                #     {<group>: [<sub layers]}
-                'groups_to_expand': {},
-                # lookup for layers with custom legend images:
-                #     {<layer>: <legend img>}
-                'legend_images': {}
-            }
-            self.collect_layers(wms['root_layer'], resources, False)
+            layers = {}
+            self.collect_layers(wms['root_layer'], layers, False)
+            wms_services[wms['name']] = {'layers': layers}
 
-            wms_services[wms['name']] = resources
+        return {'wms_services': wms_services}
 
-        return {
-            'wms_services': wms_services
-        }
-
-    def collect_layers(self, layer, resources, hidden):
+    def collect_layers(self, layer, layers, hidden):
         """Recursively collect layer info for layer subtree from config.
 
         :param obj layer: Layer or group layer
-        :param obj resources: Partial lookups for layer resources
+        :param obj layers: Collected layers
         :param bool hidden: Whether layer is a hidden sublayer
         """
-        if not hidden:
-            resources['public_layers'].append(layer['name'])
-        resources['available_layers'].append(layer['name'])
 
         if layer.get('layers'):
-            # group layer
-
+            # group
+            layers[layer['name']] = {
+                'sublayers': [],
+                'hidden': hidden,
+                'hide_sublayers': layer.get('hide_sublayers', False)
+            }
             hidden |= layer.get('hide_sublayers', False)
-            sublayers_have_custom_legend = False
-
-            # collect sublayers
-            sublayers = []
             for sublayer in layer['layers']:
-                sublayers.append(sublayer['name'])
-                # recursively collect sublayer
-                self.collect_layers(sublayer, resources, hidden)
-                if (
-                    sublayer['name'] in resources['legend_images'] or
-                    sublayer['name'] in resources['groups_to_expand']
-                ):
-                    # sublayer has custom legend image
-                    # or is a group containing such sublayers
-                    sublayers_have_custom_legend |= True
-
-            resources['group_layers'][layer['name']] = sublayers
-
-            if layer.get('legend_image') or layer.get('legend_image_base64'):
-                # set custom legend image for group with hidden sublayers
-                # Note: overrides any custom legend image of sublayers
-                image_path = self.legend_image_path(layer)
-                if image_path is not None:
-                    resources['legend_images'][layer['name']] = image_path
-            elif layer.get('hide_sublayers') or sublayers_have_custom_legend:
-                # group has sublayer with custom legend image
-                resources['groups_to_expand'][layer['name']] = sublayers
+                self.collect_layers(sublayer, layers, hidden)
+                layers[layer['name']]['sublayers'].append(sublayer['name'])
         else:
-            # layer
-            if layer.get('legend_image') or layer.get('legend_image_base64'):
-                # set custom legend image
-                image_path = self.legend_image_path(layer)
-                if image_path is not None:
-                    resources['legend_images'][layer['name']] = image_path
+            layers[layer['name']] = {
+                'hidden': hidden,
+                'legend_image': layer.get('legend_image', None),
+                'legend_image_base64': layer.get('legend_image_base64', None)
+            }
 
-    def legend_image_path(self, layer):
-        """Return path to custom legend image
-        (either from file or from Base64 encoded image).
-
-        :param obj layer: Layer or group layer
-        """
-        image_path = None
-
-        if layer.get('legend_image'):
-            # relative path to legend_images_path
-            image_path = layer.get('legend_image')
-        elif layer.get('legend_image_base64'):
-            # absolute path to images_temp_dir
-            image_path = self.extract_base64_legend_image(layer)
-
-        return image_path
-
-    def extract_base64_legend_image(self, layer):
-        """Extract Base64 encoded legend image to file and return its path.
-
-        :param obj layer: Layer or group layer
-        """
-        image_path = None
-
-        try:
-            if self.images_temp_dir is None:
-                # create temporary target dir
-                self.images_temp_dir = tempfile.TemporaryDirectory(
-                    prefix='qwc-legend-service-'
-                )
-
-            # decode and save as image file
-            filename = "%s-%s.png" % (layer['name'], uuid.uuid4())
-            image_path = os.path.join(self.images_temp_dir.name, filename)
-            with open(image_path, 'wb') as f:
-                f.write(base64.b64decode(layer.get('legend_image_base64')))
-        except Exception as e:
-            image_path = None
-            self.logger.error(
-                "Could not extract Base64 encoded legend image for layer '%s':"
-                "\n%s" % (layer['name'], e)
-            )
-
-        return image_path
-
-    def wms_permitted(self, service_name, identity):
-        """Return whether WMS is available and permitted.
+    def wms_permissions(self, service_name, identity):
+        """Return WMS permissions, if service is available and permitted.
 
         :param str service_name: Service name
         :param obj identity: User identity
         """
         if self.resources['wms_services'].get(service_name):
             # get permissions for WMS
-            wms_permissions = self.permissions_handler.resource_permissions(
+            return self.permissions_handler.resource_permissions(
                 'wms_services', identity, service_name
             )
-            if wms_permissions:
-                return True
 
-        return False
-
-    def permitted_resources(self, service_name, identity):
-        """Return permitted resources for a legend service.
-
-        :param str service_name: Service name
-        :param obj identity: User identity
-        """
-        if not self.resources['wms_services'].get(service_name):
-            # WMS service unknown
-            return {}
-
-        # get permissions for WMS
-        wms_permissions = self.permissions_handler.resource_permissions(
-            'wms_services', identity, service_name
-        )
-        if not wms_permissions:
-            # WMS not permitted
-            return {}
-
-        wms_resources = self.resources['wms_services'][service_name].copy()
-
-        # get available layers
-        available_layers = wms_resources['available_layers']
-
-        # combine permissions
-        permitted_layers = set()
-        for permission in wms_permissions:
-            for layer in permission['layers']:
-                name = layer['name']
-                if name in available_layers:
-                    permitted_layers.add(name)
-
-        # filter by permissions
-
-        # public layers
-        public_layers = [
-            layer for layer in wms_resources['public_layers']
-            if layer in permitted_layers
-        ]
-
-        # collect restricted group layers
-        restricted_group_layers = {}
-        self.collect_restricted_group_layers(
-            wms_resources['root_layer'], wms_resources['group_layers'],
-            permitted_layers, restricted_group_layers
-        )
-        # merge with groups to expand
-        groups_to_expand = wms_resources['groups_to_expand']
-        for group, allowed_sublayers in restricted_group_layers.items():
-            # update with allowed layers
-            groups_to_expand[group] = allowed_sublayers
-
-        return {
-            'permitted_layers': sorted(list(permitted_layers)),
-            'public_layers': public_layers,
-            'groups_to_expand': groups_to_expand
-        }
-
-    def collect_restricted_group_layers(self, layer, group_layers,
-                                        permitted_layers,
-                                        restricted_group_layers):
-        """Recursively collect group layers with restricted sublayers.
-
-        :param str layer: Layer name
-        :param obj group_layers: Lookup for group layers
-        :param list(str) permitted_layers: List of permitted layer names
-        :Param obj restricted_group_layers: Partial lookup for restricted
-                                            group layers
-        """
-        if layer in group_layers:
-            # group layer
-
-            # collect sublayers
-            sublayers = []
-            sublayers_restricted = False
-            for sublayer in group_layers[layer]:
-                if sublayer in permitted_layers:
-                    # add permitted layer
-                    sublayers.append(sublayer)
-
-                # recursively collect sublayer
-                self.collect_restricted_group_layers(
-                    sublayer, group_layers, permitted_layers,
-                    restricted_group_layers
-                )
-                if (
-                    sublayer not in permitted_layers or
-                    sublayer in restricted_group_layers
-                ):
-                    # sublayer is restricted
-                    # or is a group containing such sublayers
-                    sublayers_restricted |= True
-
-            if sublayers_restricted:
-                # group has restricted sublayers
-                restricted_group_layers[layer] = sublayers
+        return None
