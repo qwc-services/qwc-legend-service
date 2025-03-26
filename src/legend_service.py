@@ -294,7 +294,7 @@ class LegendService:
                 )
 
             # NOTE: hide_sublayers: see somap#691
-            if have_custom_images or resource_entries['hide_sublayers']:
+            if have_custom_images or resource_entry['hide_sublayers']:
                 expanded_layer_styles.extend(group_layer_styles)
             else:
                 requested_layer_style.update({'custom_legend_image': None})
