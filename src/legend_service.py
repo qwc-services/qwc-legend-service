@@ -7,6 +7,7 @@ import uuid
 from PIL import Image
 from flask import Response, send_file
 import requests
+from xml.sax.saxutils import escape as xml_escape
 
 from qwc_services_core.permissions_reader import PermissionsReader
 from qwc_services_core.runtime_config import RuntimeConfig
@@ -274,7 +275,7 @@ class LegendService:
                 '<ServiceExceptionReport version="1.3.0">\n'
                 ' <ServiceException code="%s">%s</ServiceException>\n'
                 '</ServiceExceptionReport>'
-                % (code, message)
+                % (code, xml_escape(message))
             ),
             content_type='text/xml; charset=utf-8',
             status=200
