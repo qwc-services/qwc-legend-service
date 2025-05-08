@@ -426,7 +426,11 @@ class LegendService:
             hidden |= layer.get('hide_sublayers', False)
             for sublayer in layer['layers']:
                 self.collect_layers(sublayer, layers, hidden)
-                layers[layer['name']]['sublayers'].append(sublayer['name'])
+                # If there are colliding group/layer names, the group entry may have been overwritten by a layer entry
+                # in the nested collect_layers call
+                if 'sublayer' in layers[layer['name']]:
+                    layers[layer['name']]['sublayers'].append(sublayer['name'])
+
         else:
             layers[layer['name']] = {
                 'hidden': hidden,
