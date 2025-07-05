@@ -309,9 +309,14 @@ class LegendService:
 
     def get_custom_image(self, layer, resource_entry, service_name, type):
         """ Return the custom legend image for the specified layer, if found
-            - Below legend_images_path/<service_name>/<layer><suffix>.png
-            - Below legend_images_path/<resource_entry[legend_image]>
+            - A filename matching legend_images_path/<service_name>/<layer>_<suffix>.png
+            - A filename matching legend_images_path/<service_name>/default_<suffix>.png
+            - A filename matching legend_images_path/<service_name>/<layer>.png
+            - A filename matching legend_images_path/<resource_entry[legend_image]>
+            - A filename matching legend_images_path/<service_name>/default.png
             - As base64 in <resource_entry[legend_image_base64]>
+        Where _<suffix> may be "_thumbnail" or "_tooltip".
+
         :param str layer: The layer name
         :param dict resource_entry: The layer resource entry
         :param str service_name: The WMS service name
@@ -321,12 +326,16 @@ class LegendService:
         filenames = []
         if type == "thumbnail":
             filenames.append(os.path.join(service_name, layer + "_thumbnail.png"))
+            filenames.append("default_thumbnail.png")
         elif type == "tooltip":
             filenames.append(os.path.join(service_name, layer + "_tooltip.png"))
+            filenames.append("default_tooltip.png")
         filenames.append(os.path.join(service_name, layer + '.png'))
 
         if resource_entry['legend_image']:
             filenames.append(resource_entry['legend_image'])
+
+        filenames.append('default.png')
 
         for filename in filenames:
             image_path = os.path.join(self.legend_images_path, filename)
@@ -347,29 +356,6 @@ class LegendService:
         if resource_entry['legend_image_base64']:
             self.logger.debug("Decoded base64 custom legend for layer '%s'" % (layer))
             return base64.b64decode(resource_entry['legend_image_base64'])
-
-        # Look for fallback default images
-        filenames = []
-        if type == "thumbnail":
-            filenames.append("default_thumbnail.png")
-        elif type == "tooltip":
-            filenames.append("default_tooltip.png")
-            allowempty = True
-        filenames.append('default.png')
-        for filename in filenames:
-            image_path = os.path.join(self.legend_images_path, filename)
-            self.logger.debug(
-                "Looking for legend image '%s' for layer '%s'..." % (image_path, layer)
-            )
-            try:
-                data = open(os.path.join(self.legend_images_path, filename), 'rb').read()
-            except:
-                data = None
-            if data:
-                self.logger.debug(
-                    "Loading legend image '%s' for layer '%s'" % (image_path, layer)
-                )
-                return data
 
         self.logger.debug("No custom legend image of type '%s' found for layer '%s'" % (type, layer))
         return None
