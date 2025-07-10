@@ -191,6 +191,11 @@ Sample request:
 
     http://localhost:5014/qwc_demo?SERVICE=WMS&REQUEST=GetLegendGraphic&LAYER=qwc_demo&format=image/png
 
+Docker usage
+------------
+
+See sample [docker-compose.yml](https://github.com/qwc-services/qwc-docker/blob/master/docker-compose-example.yml) of [qwc-docker](https://github.com/qwc-services/qwc-docker).
+
 
 Development
 -----------
