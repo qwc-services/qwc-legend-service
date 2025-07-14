@@ -53,6 +53,11 @@ class LegendService:
         self.qgis_server_url = config.get(
             'default_qgis_server_url', 'http://localhost:8001/ows/'
         ).rstrip('/') + '/'
+
+        qgis_server_url_tenant_suffix = config.get('qgis_server_url_tenant_suffix', '').strip('/')
+        if qgis_server_url_tenant_suffix:
+            self.qgis_server_url += qgis_server_url_tenant_suffix + '/'
+
         self.basic_auth_login_url = config.get('basic_auth_login_url')
         self.legend_default_font_size = config.get("legend_default_font_size")
 

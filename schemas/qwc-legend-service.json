@@ -24,6 +24,10 @@
           "description": "Default base URL for forwarding WMS GetLegendGraphics requests. Default: `http://localhost:8001/ows/`",
           "type": "string"
         },
+        "qgis_server_url_tenant_suffix": {
+          "description": "If qgs_resources are placed in tenant specific subdirs, set this property to the respective subdir path portion. Default: `<empty>`",
+          "type": "string"
+        },
         "legend_default_font_size": {
           "description": "Default font size for GetLegendGraphic request. Default: `null`",
           "type": "number"
