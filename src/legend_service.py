@@ -124,7 +124,7 @@ class LegendService:
                         new_size = (
                             int(img.width * scale), int(img.height * scale)
                         )
-                        img = img.resize(new_size, Image.ANTIALIAS)
+                        img = img.resize(new_size, Image.LANCZOS)
                         output = BytesIO()
                         # NOTE: save as PNG to preserve any alpha channel
                         img.save(output, "PNG")
