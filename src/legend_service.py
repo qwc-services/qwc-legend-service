@@ -58,6 +58,8 @@ class LegendService:
         if qgis_server_url_tenant_suffix:
             self.qgis_server_url += qgis_server_url_tenant_suffix + '/'
 
+        self.network_timeout = config.get('network_timeout', 30)
+
         self.basic_auth_login_url = config.get('basic_auth_login_url')
         self.legend_default_font_size = config.get("legend_default_font_size")
 
@@ -175,7 +177,7 @@ class LegendService:
                             self.legend_default_font_size
                 response = requests.get(
                     self.qgis_server_url + service_name, params=req_params,
-                    timeout=30
+                    timeout=self.network_timeout
                 )
                 self.logger.debug("Forwarding request to %s" % response.url)
 
