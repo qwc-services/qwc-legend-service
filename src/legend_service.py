@@ -309,15 +309,17 @@ class LegendService:
             return have_custom_images
         else:
             # Resolve custom images
-            custom_image = self.get_custom_image(layer, resource_entry, service_name, type)
+            custom_image = self.get_custom_image(layer, resource_entry, service_name, type, requested_layer_style['style'])
             requested_layer_style.update({'custom_legend_image': custom_image})
             expanded_layer_styles.append(requested_layer_style)
             return custom_image != None
 
-    def get_custom_image(self, layer, resource_entry, service_name, type):
+    def get_custom_image(self, layer, resource_entry, service_name, type, style):
         """ Return the custom legend image for the specified layer, if found
+            - A filename matching legend_images_path/<service_name>/<layer>_<style>_<suffix>.png
             - A filename matching legend_images_path/<service_name>/<layer>_<suffix>.png
             - A filename matching legend_images_path/<service_name>/default_<suffix>.png
+        - A filename matching legend_images_path/<service_name>/<layer>_<style>.png
             - A filename matching legend_images_path/<service_name>/<layer>.png
             - A filename matching legend_images_path/<resource_entry[legend_image]>
             - A filename matching legend_images_path/<service_name>/default.png
@@ -332,11 +334,14 @@ class LegendService:
         # Check for image in legend_images_path
         filenames = []
         if type == "thumbnail":
+            filenames.append(os.path.join(service_name, layer + "_" + style + "_thumbnail.png"))
             filenames.append(os.path.join(service_name, layer + "_thumbnail.png"))
             filenames.append("default_thumbnail.png")
         elif type == "tooltip":
+            filenames.append(os.path.join(service_name, layer + "_" + style + "_tooltip.png"))
             filenames.append(os.path.join(service_name, layer + "_tooltip.png"))
             filenames.append("default_tooltip.png")
+        filenames.append(os.path.join(service_name, layer + "_" + style + '.png'))
         filenames.append(os.path.join(service_name, layer + '.png'))
 
         if resource_entry['legend_image']:
