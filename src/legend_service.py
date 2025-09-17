@@ -319,7 +319,7 @@ class LegendService:
             - A filename matching legend_images_path/<service_name>/<layer>_<style>_<suffix>.png
             - A filename matching legend_images_path/<service_name>/<layer>_<suffix>.png
             - A filename matching legend_images_path/<service_name>/default_<suffix>.png
-        - A filename matching legend_images_path/<service_name>/<layer>_<style>.png
+            - A filename matching legend_images_path/<service_name>/<layer>_<style>.png
             - A filename matching legend_images_path/<service_name>/<layer>.png
             - A filename matching legend_images_path/<resource_entry[legend_image]>
             - A filename matching legend_images_path/<service_name>/default.png
