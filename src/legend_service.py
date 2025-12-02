@@ -9,6 +9,7 @@ from flask import Response, send_file
 import requests
 from xml.sax.saxutils import escape as xml_escape
 
+from qwc_services_core.auth import get_username
 from qwc_services_core.permissions_reader import PermissionsReader
 from qwc_services_core.runtime_config import RuntimeConfig
 
@@ -57,6 +58,7 @@ class LegendService:
         qgis_server_url_tenant_suffix = config.get('qgis_server_url_tenant_suffix', '').strip('/')
         if qgis_server_url_tenant_suffix:
             self.qgis_server_url += qgis_server_url_tenant_suffix + '/'
+        self.qgis_server_identity_parameter = config.get('qgis_server_identity_parameter', "QWC_USERNAME")
 
         self.network_timeout = config.get('network_timeout', 30)
 
@@ -168,6 +170,16 @@ class LegendService:
                     "style": layer_style['style']
                 }
                 req_params.update(params)
+
+                # Inject identity parameter if configured
+                qgis_server_identity_parameter = self.qgis_server_identity_parameter
+                if qgis_server_identity_parameter is not None:
+                    parameter_name = qgis_server_identity_parameter.upper()
+                    if identity:
+                        req_params[parameter_name] = get_username(identity)
+                    elif parameter_name in params:
+                        del req_params[parameter_name]
+
                 if self.legend_default_font_size:
                     if 'layerfontsize' not in req_params:
                         req_params['layerfontsize'] = \
