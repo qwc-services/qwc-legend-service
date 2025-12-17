@@ -211,7 +211,7 @@ class LegendService:
             # layer not found or faulty
             return self.service_exception(
                 'LayerNotDefined',
-                'Layer "%s" does not exist or is not permitted' % layer_param
+                'Layer "%s" does not exist or is not permitted' % layers_param
             )
 
         # If just one image, return it
