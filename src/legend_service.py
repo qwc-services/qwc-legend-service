@@ -187,11 +187,21 @@ class LegendService:
                     if 'itemfontsize' not in req_params:
                         req_params['itemfontsize'] = \
                             self.legend_default_font_size
-                response = requests.get(
-                    self.qgis_server_url + service_name, params=req_params,
-                    timeout=self.network_timeout
-                )
-                self.logger.debug("Forwarding request to %s" % response.url)
+                try:
+                    request_url = self.qgis_server_url + service_name
+                    self.logger.debug("Forwarding request to %s" % request_url)
+                    response = requests.get(
+                        request_url, params=req_params, timeout=self.network_timeout
+                    )
+                except Exception as e:
+                    self.logger.error("Failed to forward request: %s" % str(e))
+                    # Empty image in case of server error
+                    output = BytesIO()
+                    Image.new("RGB", (1, 1), (255, 255, 255)).save(
+                        output, PIL_Formats[format_param]
+                    )
+                    imgdata.append({"data": output, "format": format_param})
+                    continue
 
                 if response.content.startswith(b'<ServiceExceptionReport'):
                     self.logger.warning(response.content)
