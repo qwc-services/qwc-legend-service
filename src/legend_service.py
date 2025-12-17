@@ -429,7 +429,7 @@ class LegendService:
         if layer.get('layers'):
             # group
             layers[layer['name']] = {
-                'sublayers': [],
+                'sublayers': [sublayer['name'] for sublayer in layer['layers']],
                 'hidden': hidden,
                 'hide_sublayers': layer.get('hide_sublayers', False)
             }
