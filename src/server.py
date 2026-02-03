@@ -1,3 +1,4 @@
+import os
 import requests
 
 from flask import Flask, jsonify, json, request
@@ -200,7 +201,7 @@ def healthz():
 
 # local webserver
 if __name__ == '__main__':
-    print("Starting GetLegend service...")
+    print("Starting Legend service...")
     from flask_cors import CORS
     CORS(app)
-    app.run(host='localhost', port=5014, debug=True)
+    app.run(host='localhost', port=os.environ.get("FLASK_RUN_PORT", 5000), debug=True)
